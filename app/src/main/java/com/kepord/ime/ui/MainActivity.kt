@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -90,7 +88,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -101,10 +98,13 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kepord.ime.KepordApplication
 import com.kepord.ime.clipboard.ClipEntry
 import com.kepord.ime.clipboard.ClipboardStore
 import com.kepord.ime.data.KepordPreferences
+import com.kepord.ime.ime.ArabicFontEngine
+import com.kepord.ime.ime.ArabicFontStyle
 import com.kepord.ime.model.Background3DStyle
 import com.kepord.ime.model.KepordConfig
 import com.kepord.ime.model.LetterColorMode
@@ -143,7 +143,7 @@ private enum class KepordTab(val title: String, val icon: ImageVector) {
     HOME_TEST("التجربة", Icons.Rounded.Keyboard),
     LETTER_RGB("الأحرف", Icons.Rounded.Palette),
     THREE_D("3D والخلفية", Icons.Rounded.ViewInAr),
-    TYPING("النظام", Icons.Rounded.Tune),
+    FONTS_SYSTEM("الخط والنظام", Icons.Rounded.Tune),
     CLIPBOARD("الحافظة", Icons.Rounded.ContentPaste)
 }
 
@@ -249,7 +249,7 @@ private fun KepordMainScreen(
                         label = {
                             Text(
                                 text = tab.title,
-                                fontSize = 10.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 maxLines = 1
                             )
@@ -285,6 +285,7 @@ private fun KepordMainScreen(
                         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                         imm.showInputMethodPicker()
                     },
+                    onGoToFonts = { activeTab = KepordTab.FONTS_SYSTEM.ordinal },
                     onCopyToClipboard = { txt ->
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("kepord_test", txt))
@@ -303,7 +304,7 @@ private fun KepordMainScreen(
                     onUpdate = { preferences.update(it) }
                 )
 
-                KepordTab.TYPING -> TypingAndSystemTab(
+                KepordTab.FONTS_SYSTEM -> FontsAndSystemTab(
                     config = config,
                     onUpdate = { preferences.update(it) },
                     onResetDefaults = {
@@ -326,7 +327,6 @@ private fun KepordMainScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeAndLiveTestTab(
     config: KepordConfig,
@@ -335,6 +335,7 @@ private fun HomeAndLiveTestTab(
     isImeSelected: Boolean,
     onOpenImeSettings: () -> Unit,
     onShowImePicker: () -> Unit,
+    onGoToFonts: () -> Unit,
     onCopyToClipboard: (String) -> Unit
 ) {
     var testText by remember { mutableStateOf("") }
@@ -347,7 +348,6 @@ private fun HomeAndLiveTestTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Setup & Activation Card
         LuxuryCard(title = "حالة التفعيل على النظام (Android 13)") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -394,13 +394,28 @@ private fun HomeAndLiveTestTab(
             }
         }
 
-        // 2. Live Dedicated Testing Area ("مكان مخصص للتجربة")
         LuxuryCard(title = "استوديو التجربة المباشرة (Live Test Box)") {
-            Text(
-                text = "اضغط في المربع أدناه لفتح الكيبورد وتجربة جميع التعديلات (الأحرف المضيئة، البروز 3D، التبديل AR/EN، ولصق آلاف الأسطر من الحافظة):",
-                color = KepordPalette.MutedGray,
-                fontSize = 12.sp
-            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onGoToFonts),
+                shape = RoundedCornerShape(10.dp),
+                color = KepordPalette.SurfaceElevated,
+                border = BorderStroke(1.dp, KepordPalette.BorderStrong)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("الخط العربي النشط للكتابة:", color = KepordPalette.MutedGray, fontSize = 10.5.sp)
+                        Text(config.arabicFontStyle.titleAr, color = KepordPalette.PureWhite, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("تغيير الخط ›", color = KepordPalette.PureWhite, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
             OutlinedTextField(
                 value = testText,
                 onValueChange = { testText = it },
@@ -409,7 +424,7 @@ private fun HomeAndLiveTestTab(
                     .heightIn(min = 140.dp, max = 260.dp),
                 placeholder = {
                     Text(
-                        "اكتب أو الصق هنا لتجربة Kepord فوراً...",
+                        "اضغط هنا واكتب أو الصق لتجربة الإضاءة 3D والخطوط والإيموجي فوراً...",
                         color = KepordPalette.MutedGray
                     )
                 },
@@ -447,8 +462,8 @@ private fun HomeAndLiveTestTab(
                 }
             }
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
@@ -456,6 +471,7 @@ private fun HomeAndLiveTestTab(
                         val sample = "مرحباً بك في كيبورد Kepord Pro 3D!\nاختبار العربية مع التشكيل: أَبْجَدْ هَوَّزْ حُطِّي كَلَمُنْ — English Test 12345"
                         onCopyToClipboard(sample)
                     },
+                    modifier = Modifier.fillMaxWidth(),
                     border = BorderStroke(1.dp, KepordPalette.BorderStrong),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
                 ) {
@@ -471,6 +487,7 @@ private fun HomeAndLiveTestTab(
                         }
                         onCopyToClipboard(sb.toString())
                     },
+                    modifier = Modifier.fillMaxWidth(),
                     border = BorderStroke(1.dp, KepordPalette.PureWhite),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
                 ) {
@@ -479,7 +496,6 @@ private fun HomeAndLiveTestTab(
             }
         }
 
-        // 3. Real-Time Engine Preview Window
         LuxuryCard(title = "معاينة حية لمحرك الرسم 3D الآن") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -515,7 +531,7 @@ private fun LetterLightingTab(
     config: KepordConfig,
     onUpdate: ((KepordConfig) -> KepordConfig) -> Unit
 ) {
-    var editingStopIndex by remember { mutableIntStateOf(0) } // 0=Static, 1=Grad1, 2=Grad2, 3=Grad3
+    var editingStopIndex by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -658,14 +674,14 @@ private fun ColorPickerControls(
     onColorChange: (Int) -> Unit
 ) {
     val presets = listOf(
-        0xFFFFFFFF.toInt(), // أبيض ساطع
-        0xFF00F0FF.toInt(), // سماوي سيبر
-        0xFF00E676.toInt(), // أخضر نيون
-        0xFFFFEA00.toInt(), // ذهبي مشرق
-        0xFFFF5252.toInt(), // قرمزي
-        0xFFFF007F.toInt(), // ماجنتا
-        0xFFAA00FF.toInt(), // بنفسجي
-        0xFF448AFF.toInt()  // أزرق كهربائي
+        0xFFFFFFFF.toInt(),
+        0xFF00F0FF.toInt(),
+        0xFF00E676.toInt(),
+        0xFFFFEA00.toInt(),
+        0xFFFF5252.toInt(),
+        0xFFFF007F.toInt(),
+        0xFFAA00FF.toInt(),
+        0xFF448AFF.toInt()
     )
 
     Row(
@@ -807,11 +823,13 @@ private fun ThreeDBackgroundTab(
 }
 
 @Composable
-private fun TypingAndSystemTab(
+private fun FontsAndSystemTab(
     config: KepordConfig,
     onUpdate: ((KepordConfig) -> KepordConfig) -> Unit,
     onResetDefaults: () -> Unit
 ) {
+    val samplePhrase = "مرحبا بكم في كيبورد Kepord الفاخر"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -819,6 +837,55 @@ private fun TypingAndSystemTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        LuxuryCard(title = "أشهر 10 خطوط عربية للكتابة (تبقى فعالة حتى تغيرها)") {
+            Text(
+                text = "الخط الذي تختاره هنا سيكتب به الكيبورد تلقائياً في واتساب وتيليجرام وكل التطبيقات:",
+                color = KepordPalette.MutedGray,
+                fontSize = 11.5.sp
+            )
+
+            ArabicFontStyle.entries.forEach { font ->
+                val selected = config.arabicFontStyle == font
+                val preview = remember(font) { ArabicFontEngine.transformFullText(samplePhrase, font) }
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onUpdate { it.copy(arabicFontStyle = font) } },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (selected) KepordPalette.SurfaceElevated else KepordPalette.PureBlack,
+                    border = BorderStroke(
+                        width = if (selected) 1.5.dp else 1.dp,
+                        color = if (selected) KepordPalette.PureWhite else KepordPalette.BorderHairline
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text(font.titleAr, color = KepordPalette.PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(font.descAr, color = KepordPalette.MutedGray, fontSize = 10.5.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = preview,
+                                color = KepordPalette.SoftWhite,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(if (selected) KepordPalette.PureWhite else Color.Transparent)
+                                .border(1.5.dp, KepordPalette.PureWhite, CircleShape)
+                        )
+                    }
+                }
+            }
+        }
+
         LuxuryCard(title = "التخطيط واللغة والأبعاد") {
             LuxurySwitchRow(
                 title = "لغة البدء الافتراضية: العربية",
@@ -1049,7 +1116,6 @@ private fun ClipboardVaultTab(
                                     onClick = {
                                         scope.launch {
                                             val full = clipboardStore.readFullText(entry)
-                                            // Chunk by 35 lines per item so viewing 10,000+ lines stays smooth at 120Hz
                                             inspectedLines = full.split('\n').chunked(35).map { it.joinToString("\n") }
                                             inspectedEntry = entry
                                         }
