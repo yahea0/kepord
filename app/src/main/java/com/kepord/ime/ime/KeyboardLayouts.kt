@@ -127,12 +127,13 @@ object KeyboardLayouts {
             specialKey("⌫", KeyAction.BACKSPACE, weight = 1.45f)
         ),
         listOf(
-            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.35f),
-            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.35f),
-            charKey("،", "،", alternates = listOf("،", "؛", "؟", "!")),
-            specialKey("العربية • Kepord", KeyAction.SPACE, weight = 4.3f),
-            charKey(".", ".", alternates = listOf(".", "؟", "!", ":", "...")),
-            specialKey("↵", KeyAction.ENTER, weight = 1.55f)
+            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.25f),
+            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.15f),
+            specialKey("😀", KeyAction.OPEN_EMOJI, weight = 1.05f),
+            charKey("،", "،", alternates = listOf("،", "؛", "؟", "!"), weight = 0.85f),
+            specialKey("العربية • Kepord", KeyAction.SPACE, weight = 3.45f),
+            charKey(".", ".", alternates = listOf(".", "؟", "!", ":", "..."), weight = 0.85f),
+            specialKey("↵", KeyAction.ENTER, weight = 1.40f)
         )
     )
 
@@ -174,12 +175,13 @@ object KeyboardLayouts {
             specialKey("⌫", KeyAction.BACKSPACE, weight = 1.45f)
         ),
         listOf(
-            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.35f),
-            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.35f),
-            charKey("،"),
-            specialKey("التشكيل • Kepord", KeyAction.SPACE, weight = 4.3f),
-            charKey("."),
-            specialKey("↵", KeyAction.ENTER, weight = 1.55f)
+            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.25f),
+            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.15f),
+            specialKey("😀", KeyAction.OPEN_EMOJI, weight = 1.05f),
+            charKey("،", weight = 0.85f),
+            specialKey("التشكيل • Kepord", KeyAction.SPACE, weight = 3.45f),
+            charKey(".", weight = 0.85f),
+            specialKey("↵", KeyAction.ENTER, weight = 1.40f)
         )
     )
 
@@ -219,12 +221,13 @@ object KeyboardLayouts {
             specialKey("⌫", KeyAction.BACKSPACE, weight = 1.45f)
         ),
         listOf(
-            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.35f),
-            specialKey("EN/AR", KeyAction.LANG_SWITCH, weight = 1.35f),
-            charKey(",", ",", alternates = listOf(",", ";", ":")),
-            specialKey("English • Kepord", KeyAction.SPACE, weight = 4.3f),
-            charKey(".", ".", alternates = listOf(".", "!", "?", "/", "_")),
-            specialKey("↵", KeyAction.ENTER, weight = 1.55f)
+            specialKey("?123", KeyAction.TO_SYMBOLS_1, weight = 1.25f),
+            specialKey("EN/AR", KeyAction.LANG_SWITCH, weight = 1.15f),
+            specialKey("😀", KeyAction.OPEN_EMOJI, weight = 1.05f),
+            charKey(",", ",", alternates = listOf(",", ";", ":"), weight = 0.85f),
+            specialKey("English • Kepord", KeyAction.SPACE, weight = 3.45f),
+            charKey(".", ".", alternates = listOf(".", "!", "?", "/", "_"), weight = 0.85f),
+            specialKey("↵", KeyAction.ENTER, weight = 1.40f)
         )
     )
 
@@ -244,12 +247,13 @@ object KeyboardLayouts {
             specialKey("⌫", KeyAction.BACKSPACE, weight = 1.45f)
         ),
         listOf(
-            specialKey("ABC", KeyAction.TO_ALPHA, weight = 1.35f),
-            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.35f),
-            charKey(","),
-            specialKey("Space", KeyAction.SPACE, weight = 4.3f),
-            charKey("."),
-            specialKey("↵", KeyAction.ENTER, weight = 1.55f)
+            specialKey("ABC", KeyAction.TO_ALPHA, weight = 1.25f),
+            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.15f),
+            specialKey("😀", KeyAction.OPEN_EMOJI, weight = 1.05f),
+            charKey(",", weight = 0.85f),
+            specialKey("Space", KeyAction.SPACE, weight = 3.45f),
+            charKey(".", weight = 0.85f),
+            specialKey("↵", KeyAction.ENTER, weight = 1.40f)
         )
     )
 
@@ -269,12 +273,13 @@ object KeyboardLayouts {
             specialKey("⌫", KeyAction.BACKSPACE, weight = 1.45f)
         ),
         listOf(
-            specialKey("ABC", KeyAction.TO_ALPHA, weight = 1.35f),
-            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.35f),
-            charKey("_"),
-            specialKey("Coding Symbols", KeyAction.SPACE, weight = 4.3f),
-            charKey(";"),
-            specialKey("↵", KeyAction.ENTER, weight = 1.55f)
+            specialKey("ABC", KeyAction.TO_ALPHA, weight = 1.25f),
+            specialKey("AR/EN", KeyAction.LANG_SWITCH, weight = 1.15f),
+            specialKey("😀", KeyAction.OPEN_EMOJI, weight = 1.05f),
+            charKey("_", weight = 0.85f),
+            specialKey("Coding Symbols", KeyAction.SPACE, weight = 3.45f),
+            charKey(";", weight = 0.85f),
+            specialKey("↵", KeyAction.ENTER, weight = 1.40f)
         )
     )
 
@@ -292,12 +297,4 @@ object KeyboardLayouts {
             base
         }
     }
-
-    val quickEmojis = listOf(
-        "😀", "😂", "🤣", "😍", "🥰", "😎", "🤩", "🤔",
-        "🔥", "⚡", "✨", "💎", "👑", "🚀", "💯", "❤️",
-        "🖤", "🤍", "👍", "👏", "🙌", "🤝", "🙏", "💪",
-        "💻", "⌨️", "🛠️", "⚙️", "📌", "📋", "✅", "❌",
-        "🎉", "🎯", "🧠", "👁️", "🌙", "⭐", "☕", "🎶"
-    )
 }
