@@ -100,7 +100,6 @@ class ClipboardStore(
             val db = dbHelper.writableDatabase
             val existing = findByHash(db, hash)
             if (existing != null) {
-                // Verify backing file still exists; recreate if needed
                 val file = File(clipsDir, existing.fileName)
                 if (!file.exists()) {
                     file.writeText(rawText, Charsets.UTF_8)
@@ -147,11 +146,6 @@ class ClipboardStore(
         val file = File(clipsDir, entry.fileName)
         if (!file.exists()) return@withContext entry.preview
         return@withContext file.readText(Charsets.UTF_8)
-    }
-
-    fun readFullTextSync(entry: ClipEntry): String {
-        val file = File(clipsDir, entry.fileName)
-        return if (file.exists()) file.readText(Charsets.UTF_8) else entry.preview
     }
 
     fun togglePinAsync(id: String) {
@@ -348,23 +342,5 @@ class ClipboardStore(
         private const val TABLE_CLIPS = "clips"
         private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
         private val HEX = "0123456789abcdef".toCharArray()
-    }
-}
-
-app/src/main/java/com/kepord/ime/clipboard/BootReceiver.kt
-
-package com.kepord.ime.clipboard
-
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import com.kepord.ime.KepordApplication
-
-class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val app = context.applicationContext as? KepordApplication
-            app?.clipboardStore?.reloadAsync()
-        }
     }
 }
