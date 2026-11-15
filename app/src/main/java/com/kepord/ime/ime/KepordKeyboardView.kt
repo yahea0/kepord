@@ -26,7 +26,6 @@ import com.kepord.ime.model.LetterColorMode
 import com.kepord.ime.model.WavePattern
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -74,7 +73,6 @@ class KepordKeyboardView @JvmOverloads constructor(
     private var placedKeys: List<PlacedKey> = emptyList()
     private val bgRenderer = Background3DRenderer()
 
-    // Touch & pointer tracking
     private var activeKey: PlacedKey? = null
     private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var downX = 0f
@@ -83,18 +81,15 @@ class KepordKeyboardView @JvmOverloads constructor(
     private var spaceScrubTriggered = false
     private var spaceScrubAccumPx = 0f
 
-    // Long press / repeats
     private val handler = Handler(Looper.getMainLooper())
     private var isLongPressOpen = false
     private var longPressAlternates: List<String> = emptyList()
     private var longPressSelectedIndex = 0
     private var isRepeatingBackspace = false
 
-    // Ripples (fixed pool = zero allocations)
     private val ripples = Array(6) { RippleSlot() }
     private var nextRippleIdx = 0
 
-    // Pre-allocated Paints & Shaders
     private val density = resources.displayMetrics.density
     private val spScale = resources.displayMetrics.scaledDensity
 
@@ -119,6 +114,9 @@ class KepordKeyboardView @JvmOverloads constructor(
     private val letterFacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+    }
+    private val emojiKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
     }
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.RIGHT
@@ -184,8 +182,6 @@ class KepordKeyboardView @JvmOverloads constructor(
     }
 
     init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null).takeIf { false }
-        // Hardware acceleration keeps 120Hz crisp and fast
         setLayerType(LAYER_TYPE_HARDWARE, null)
         isClickable = true
         isFocusable = true
@@ -215,12 +211,6 @@ class KepordKeyboardView @JvmOverloads constructor(
         isCapsLock = false
         layoutKeys(width, height)
         invalidate()
-    }
-
-    fun toggleLanguageInstant() {
-        val nextArabic = currentPage != KeyboardPage.ARABIC && currentPage != KeyboardPage.ARABIC_SHIFT
-        setLanguageArabic(nextArabic)
-        performHaptic(15)
     }
 
     fun setActiveWindowVisibility(visible: Boolean) {
@@ -308,10 +298,8 @@ class KepordKeyboardView @JvmOverloads constructor(
 
         val nowMs = SystemClock.uptimeMillis()
 
-        // 1. Draw 3D Black & White Background
         bgRenderer.draw(canvas, w, h, config.background3DStyle, config.bg3DIntensity)
 
-        // 2. Prepare animation shader (zero object allocation!)
         val isAnimatedMode = config.letterColorMode != LetterColorMode.STATIC
         val hasActiveRipple = hasActiveRipples(nowMs)
         val phase = ((nowMs % 60000L) / 1000f) * config.waveSpeed * 0.65f
@@ -329,13 +317,11 @@ class KepordKeyboardView @JvmOverloads constructor(
         val keyAlpha = (config.keycapOpacity * 255f).toInt().coerceIn(175, 255)
         val totalKeys = placedKeys.size.coerceAtLeast(1)
 
-        // 3. Draw every 3D Keycap + 3D Extruded Illuminated Letter
         for (i in placedKeys.indices) {
             val pk = placedKeys[i]
             val isPressed = pk === activeKey
             val pressShiftY = if (isPressed) min(bevelDepth * 0.72f, 2.5f * density) else 0f
 
-            // Contact shadow below keycap for strong 3D separation from B&W background
             tempRect.set(
                 pk.rect.left,
                 pk.rect.top + bevelDepth + 1.4f * density,
@@ -345,14 +331,12 @@ class KepordKeyboardView @JvmOverloads constructor(
             keyShadowPaint.color = Color.argb(220, 0, 0, 0)
             canvas.drawRoundRect(tempRect, radius, radius, keyShadowPaint)
 
-            // 3D Keycap Bottom Skirt (Thickness)
             if (bevelDepth > 0.5f && !isPressed) {
                 tempRect.set(pk.rect.left, pk.rect.top + bevelDepth, pk.rect.right, pk.rect.bottom + bevelDepth)
                 keySkirtPaint.color = Color.argb(keyAlpha, 5, 5, 8)
                 canvas.drawRoundRect(tempRect, radius, radius, keySkirtPaint)
             }
 
-            // Keycap Top Face (Dark Obsidian Shield guarantees crisp text visibility)
             tempRect.set(
                 pk.rect.left,
                 pk.rect.top + pressShiftY,
@@ -367,7 +351,6 @@ class KepordKeyboardView @JvmOverloads constructor(
             keyBodyPaint.color = Color.argb(keyAlpha, baseTone, baseTone, baseTone + 5)
             canvas.drawRoundRect(tempRect, radius, radius, keyBodyPaint)
 
-            // Subtle upper specular bevel line
             keyTopBevelPaint.strokeWidth = 1.0f * density
             keyTopBevelPaint.color = if (isPressed) {
                 Color.argb(145, 255, 255, 255)
@@ -382,7 +365,6 @@ class KepordKeyboardView @JvmOverloads constructor(
                 keyTopBevelPaint
             )
 
-            // Crisp architectural border
             if (config.showKeyBorders) {
                 keyBorderPaint.strokeWidth = (if (isPressed) 1.3f else 0.85f) * density
                 keyBorderPaint.color = if (isPressed) {
@@ -393,7 +375,6 @@ class KepordKeyboardView @JvmOverloads constructor(
                 canvas.drawRoundRect(tempRect, radius, radius, keyBorderPaint)
             }
 
-            // Secondary hint label (top-right inside key)
             val hint = pk.spec.hint
             if (config.showSecondaryHints && !hint.isNullOrEmpty()) {
                 hintPaint.textSize = 9.5f * spScale * config.letterSizeScale
@@ -406,24 +387,27 @@ class KepordKeyboardView @JvmOverloads constructor(
                 )
             }
 
-            // Compute exact per-key color (for 3D extrusion & cascade/breathing/ripple)
-            val keyColor = evaluateKeyColor(pk, i, totalKeys, phase, nowMs, isPressed)
-
-            // Determine displayed label
-            val label = resolveKeyLabel(pk.spec)
-            draw3DIlluminatedLetter(
-                canvas = canvas,
-                label = label,
-                keyRect = tempRect,
-                spec = pk.spec,
-                solidOrSampleColor = keyColor,
-                shader = activeShader,
-                isPressed = isPressed,
-                hasRippleBoost = hasActiveRipple && computeRippleBoost(pk.rect.centerX(), pk.rect.centerY(), nowMs) > 0.15f
-            )
+            if (pk.spec.action == KeyAction.OPEN_EMOJI) {
+                emojiKeyPaint.textSize = 18f * spScale
+                val fm = emojiKeyPaint.fontMetrics
+                val cy = tempRect.centerY() - (fm.ascent + fm.descent) * 0.5f
+                canvas.drawText(pk.spec.label, tempRect.centerX(), cy, emojiKeyPaint)
+            } else {
+                val keyColor = evaluateKeyColor(pk, i, totalKeys, phase, nowMs, isPressed)
+                val label = resolveKeyLabel(pk.spec)
+                draw3DIlluminatedLetter(
+                    canvas = canvas,
+                    label = label,
+                    keyRect = tempRect,
+                    spec = pk.spec,
+                    solidOrSampleColor = keyColor,
+                    shader = activeShader,
+                    isPressed = isPressed,
+                    hasRippleBoost = hasActiveRipple && computeRippleBoost(pk.rect.centerX(), pk.rect.centerY(), nowMs) > 0.15f
+                )
+            }
         }
 
-        // 4. Draw Floating Key Preview or Long-Press Alternate Picker
         val ak = activeKey
         if (ak != null) {
             if (isLongPressOpen && longPressAlternates.isNotEmpty()) {
@@ -433,7 +417,6 @@ class KepordKeyboardView @JvmOverloads constructor(
             }
         }
 
-        // 5. Request next 120Hz frame ONLY when animated or ripple active & visible
         if (isAttachedAndVisible && (isAnimatedMode || hasActiveRipple)) {
             postInvalidateOnAnimation()
         }
@@ -451,8 +434,8 @@ class KepordKeyboardView @JvmOverloads constructor(
     ) {
         val baseSp = when {
             spec.action == KeyAction.SPACE -> 11.5f
-            label.length >= 4 -> 11.5f
-            label.length >= 2 -> 14.5f
+            label.length >= 4 -> 11.0f
+            label.length >= 2 -> 14.2f
             else -> 19.5f
         }
         val textSizePx = baseSp * spScale * config.letterSizeScale
@@ -468,13 +451,11 @@ class KepordKeyboardView @JvmOverloads constructor(
         val depth = config.letter3DDepth
         val stepPx = 0.72f * density
 
-        // A. Deep dark anchor shadow for sharp separation
         if (depth > 0) {
             val shadowOffset = (depth * stepPx) + 1.4f * density
             letterShadowPaint.color = Color.argb(235, 0, 0, 0)
             canvas.drawText(label, cx + shadowOffset, cy + shadowOffset, letterShadowPaint)
 
-            // B. Solid 3D Extruded Letter Sides (darkened metallic tint of active letter color)
             val sideColor = scaleBrightness(solidOrSampleColor, 0.30f)
             letterExtrudePaint.color = sideColor
             for (step in depth downTo 1) {
@@ -482,12 +463,10 @@ class KepordKeyboardView @JvmOverloads constructor(
                 canvas.drawText(label, cx + off * 0.85f, cy + off, letterExtrudePaint)
             }
 
-            // C. Crisp bright edge highlight on top-left of 3D letter
             letterExtrudePaint.color = Color.argb(95, 255, 255, 255)
             canvas.drawText(label, cx - 0.55f * density, cy - 0.55f * density, letterExtrudePaint)
         }
 
-        // D. Primary Illuminated Letter Face (ONLY the letter itself is colored/glowing!)
         if (shader != null && !hasRippleBoost && !isPressed) {
             letterFacePaint.shader = shader
             letterFacePaint.color = Color.WHITE
@@ -586,7 +565,6 @@ class KepordKeyboardView @JvmOverloads constructor(
         when (action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (activePointerId != MotionEvent.INVALID_POINTER_ID && action == MotionEvent.ACTION_POINTER_DOWN) {
-                    // Multi-touch fast rollover: commit previous active key cleanly
                     commitPreviousBeforeRollover()
                 }
                 val ptrId = event.getPointerId(idx)
@@ -663,7 +641,6 @@ class KepordKeyboardView @JvmOverloads constructor(
                     return true
                 }
 
-                // Switch active key slightly if user slides before long press
                 val movedKey = findKeyAt(x, y)
                 if (movedKey !== ak && movedKey != null && abs(x - downX) > 12f * density) {
                     handler.removeCallbacks(longPressRunnable)
@@ -808,7 +785,6 @@ class KepordKeyboardView @JvmOverloads constructor(
         for (pk in placedKeys) {
             if (pk.rect.contains(x, y)) return pk
         }
-        // Nearest fallback within small gap margin so fast taps never miss between gaps
         var best: PlacedKey? = null
         var bestDist = Float.MAX_VALUE
         for (pk in placedKeys) {
