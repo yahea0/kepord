@@ -196,3 +196,36 @@ class KepordPreferences(context: Context) {
             .putBoolean("auto_caps_en", c.autoCapsEnglish)
             .putBoolean("double_space_period", c.doubleSpacePeriod)
             .putInt("clip_max_unpinned", c.clipboardMaxUnpinned)
+            .putBoolean("clip_monitor", c.clipboardMonitorEnabled)
+            .putBoolean("clip_skip_sensitive", c.clipboardSkipSensitive)
+            .apply()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "kepord_prefs_v1"
+    }
+}
+
+app/src/main/java/com/kepord/ime/KepordApplication.kt
+
+package com.kepord.ime
+
+import android.app.Application
+import com.kepord.ime.clipboard.ClipboardStore
+import com.kepord.ime.data.KepordPreferences
+
+class KepordApplication : Application() {
+
+    lateinit var preferences: KepordPreferences
+        private set
+
+    lateinit var clipboardStore: ClipboardStore
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        preferences = KepordPreferences(this)
+        clipboardStore = ClipboardStore(this, preferences)
+        clipboardStore.reloadAsync()
+    }
+}
