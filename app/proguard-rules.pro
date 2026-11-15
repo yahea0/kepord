@@ -1,0 +1,2 @@
+-keep class com.kepord.ime.ime.KepordInputService { *; }
+-keep class com.kepord.ime.clipboard.BootReceiver { *; }
