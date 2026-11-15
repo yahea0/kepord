@@ -73,7 +73,6 @@ class Background3DRenderer {
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Base luxury deep black canvas
         if (style == Background3DStyle.PURE_BLACK) {
             c.drawColor(Color.BLACK)
             return bitmap
@@ -103,7 +102,6 @@ class Background3DRenderer {
         val vpY = -h * 0.35f
         val baseAlpha = (85f * intensity).toInt().coerceIn(22, 115)
 
-        // Subtle white horizon glow at top edge
         bgPaint.shader = LinearGradient(
             0f, 0f, 0f, h * 0.45f,
             Color.argb((42 * intensity).toInt(), 255, 255, 255),
@@ -113,7 +111,6 @@ class Background3DRenderer {
         c.drawRect(0f, 0f, w, h * 0.45f, bgPaint)
         bgPaint.shader = null
 
-        // Perspective radiating floor lines
         val columns = 18
         strokePaint.strokeWidth = 2.0f
         for (i in -columns..columns) {
@@ -124,7 +121,6 @@ class Background3DRenderer {
             c.drawLine(vpX, vpY, bottomX, h, strokePaint)
         }
 
-        // Receding horizontal depth rungs (non-linear 3D depth spacing)
         val rows = 14
         for (r in 1..rows) {
             val t = r.toFloat() / rows
@@ -157,7 +153,6 @@ class Background3DRenderer {
             for (col in -1..cols) {
                 val cx = col * (rx * 2f) + offsetX
 
-                // Top diamond facet
                 path.reset()
                 path.moveTo(cx, cy - ry)
                 path.lineTo(cx + rx, cy)
@@ -168,7 +163,6 @@ class Background3DRenderer {
                 c.drawPath(path, fillPaint)
                 c.drawPath(path, strokePaint)
 
-                // Left facet
                 path.reset()
                 path.moveTo(cx - rx, cy)
                 path.lineTo(cx, cy + ry)
@@ -179,7 +173,6 @@ class Background3DRenderer {
                 c.drawPath(path, fillPaint)
                 c.drawPath(path, strokePaint)
 
-                // Right shadow facet
                 path.reset()
                 path.moveTo(cx, cy + ry)
                 path.lineTo(cx + rx, cy)
@@ -212,7 +205,6 @@ class Background3DRenderer {
                 if (s == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
 
-            // Fill dark 3D ridge underneath contour
             val ridgePath = Path(path)
             ridgePath.lineTo(w, h)
             ridgePath.lineTo(0f, h)
