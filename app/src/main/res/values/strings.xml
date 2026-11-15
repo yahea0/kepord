@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kepord</string>
+    <string name="ime_name">Kepord Pro 3D</string>
+    <string name="subtype_ar">العربية (Kepord)</string>
+    <string name="subtype_en">English (Kepord)</string>
+</resources>
