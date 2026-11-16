@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -115,6 +116,21 @@ class KepordKeyboardView @JvmOverloads constructor(
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
+    private val iconShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val iconExtrudePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val iconFacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val emojiKeyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
     }
@@ -134,6 +150,8 @@ class KepordKeyboardView @JvmOverloads constructor(
 
     private val tempRect = RectF()
     private val popupRect = RectF()
+    private val ovalRect = RectF()
+    private val iconPath = Path()
     private val shaderMatrix = Matrix()
 
     private var cachedShader: Shader? = null
@@ -233,9 +251,10 @@ class KepordKeyboardView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        val rows = KeyboardLayouts.getRows(currentPage, config.showNumberRow).size
-        val baseRowHeightDp = if (rows >= 5) 48f else 54f
-        val desiredH = (rows * baseRowHeightDp * config.keyboardHeightScale * density + 16f * density).toInt()
+        val rows = KeyboardLayouts.getRows(currentPage, config.showNumberRow)
+        val totalHeightUnits = rows.sumOf { it.heightWeight.toDouble() }.toFloat().coerceAtLeast(1f)
+        val baseUnitDp = 50.5f
+        val desiredH = (totalHeightUnits * baseUnitDp * config.keyboardHeightScale * density + 32f * density).toInt()
         setMeasuredDimension(w, desiredH)
     }
 
@@ -258,18 +277,21 @@ class KepordKeyboardView @JvmOverloads constructor(
         val gapY = 6.2f * density
 
         val usableW = w - outerPadX * 2f
-        val usableH = h - outerPadTop - outerPadBottom
-        val rowCount = rows.size.coerceAtLeast(1)
-        val rowHeight = (usableH - gapY * (rowCount - 1)) / rowCount
+        val usableH = h - outerPadTop - outerPadBottom - gapY * (rows.size - 1).coerceAtLeast(0)
+        val totalHeightWeight = rows.sumOf { it.heightWeight.toDouble() }.toFloat().coerceAtLeast(1f)
 
-        val list = ArrayList<PlacedKey>(52)
+        val list = ArrayList<PlacedKey>(54)
         var order = 0
+        var curY = outerPadTop
+
         for (rIdx in rows.indices) {
-            val row = rows[rIdx]
+            val rowSpec = rows[rIdx]
+            val rowH = (rowSpec.heightWeight / totalHeightWeight) * usableH
+            val row = rowSpec.keys
             val totalWeight = row.sumOf { it.weight.toDouble() }.toFloat().coerceAtLeast(1f)
-            val rowUsableW = usableW - gapX * (row.size - 1)
-            val top = outerPadTop + rIdx * (rowHeight + gapY)
-            val bottom = top + rowHeight
+            val rowUsableW = usableW - gapX * (row.size - 1).coerceAtLeast(0)
+            val top = curY
+            val bottom = top + rowH
             var curX = outerPadX
 
             for (spec in row) {
@@ -286,6 +308,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                 )
                 curX += keyW + gapX
             }
+            curY = bottom + gapY
         }
         placedKeys = list
     }
@@ -377,34 +400,50 @@ class KepordKeyboardView @JvmOverloads constructor(
 
             val hint = pk.spec.hint
             if (config.showSecondaryHints && !hint.isNullOrEmpty()) {
-                hintPaint.textSize = 9.5f * spScale * config.letterSizeScale
-                hintPaint.color = Color.argb(185, 200, 200, 212)
+                hintPaint.textSize = 9.0f * spScale * config.letterSizeScale
+                hintPaint.color = Color.argb(170, 200, 200, 212)
                 canvas.drawText(
                     hint,
-                    tempRect.right - 4.5f * density,
-                    tempRect.top + 11.5f * density,
+                    tempRect.right - 3.8f * density,
+                    tempRect.top + 10.5f * density,
                     hintPaint
                 )
             }
 
-            if (pk.spec.action == KeyAction.OPEN_EMOJI) {
-                emojiKeyPaint.textSize = 18f * spScale
-                val fm = emojiKeyPaint.fontMetrics
-                val cy = tempRect.centerY() - (fm.ascent + fm.descent) * 0.5f
-                canvas.drawText(pk.spec.label, tempRect.centerX(), cy, emojiKeyPaint)
-            } else {
-                val keyColor = evaluateKeyColor(pk, i, totalKeys, phase, nowMs, isPressed)
-                val label = resolveKeyLabel(pk.spec)
-                draw3DIlluminatedLetter(
-                    canvas = canvas,
-                    label = label,
-                    keyRect = tempRect,
-                    spec = pk.spec,
-                    solidOrSampleColor = keyColor,
-                    shader = activeShader,
-                    isPressed = isPressed,
-                    hasRippleBoost = hasActiveRipple && computeRippleBoost(pk.rect.centerX(), pk.rect.centerY(), nowMs) > 0.15f
-                )
+            val keyColor = evaluateKeyColor(pk, i, totalKeys, phase, nowMs, isPressed)
+            val hasRippleBoost = hasActiveRipple && computeRippleBoost(pk.rect.centerX(), pk.rect.centerY(), nowMs) > 0.15f
+
+            when (pk.spec.action) {
+                KeyAction.OPEN_EMOJI -> {
+                    emojiKeyPaint.textSize = 18f * spScale
+                    val fm = emojiKeyPaint.fontMetrics
+                    val cy = tempRect.centerY() - (fm.ascent + fm.descent) * 0.5f
+                    canvas.drawText(pk.spec.label, tempRect.centerX(), cy, emojiKeyPaint)
+                }
+                KeyAction.LANG_SWITCH, KeyAction.BACKSPACE, KeyAction.ENTER -> {
+                    draw3DIlluminatedVectorIcon(
+                        canvas = canvas,
+                        action = pk.spec.action,
+                        keyRect = tempRect,
+                        solidOrSampleColor = keyColor,
+                        shader = activeShader,
+                        isPressed = isPressed,
+                        hasRippleBoost = hasRippleBoost
+                    )
+                }
+                else -> {
+                    val label = resolveKeyLabel(pk.spec)
+                    draw3DIlluminatedLetter(
+                        canvas = canvas,
+                        label = label,
+                        keyRect = tempRect,
+                        spec = pk.spec,
+                        solidOrSampleColor = keyColor,
+                        shader = activeShader,
+                        isPressed = isPressed,
+                        hasRippleBoost = hasRippleBoost
+                    )
+                }
             }
         }
 
@@ -422,6 +461,122 @@ class KepordKeyboardView @JvmOverloads constructor(
         }
     }
 
+    private fun draw3DIlluminatedVectorIcon(
+        canvas: Canvas,
+        action: KeyAction,
+        keyRect: RectF,
+        solidOrSampleColor: Int,
+        shader: Shader?,
+        isPressed: Boolean,
+        hasRippleBoost: Boolean
+    ) {
+        val strokeW = 1.75f * density
+        iconShadowPaint.strokeWidth = strokeW
+        iconExtrudePaint.strokeWidth = strokeW
+        iconFacePaint.strokeWidth = strokeW
+
+        val cx = keyRect.centerX()
+        val cy = keyRect.centerY()
+        val unit = min(keyRect.width(), keyRect.height())
+
+        val depth = config.letter3DDepth
+        val stepPx = 0.65f * density
+
+        if (depth > 0) {
+            val shadowOffset = (depth * stepPx) + 1.2f * density
+            iconShadowPaint.color = Color.argb(235, 0, 0, 0)
+            drawIconGeometry(canvas, action, cx + shadowOffset, cy + shadowOffset, unit, iconShadowPaint)
+
+            iconExtrudePaint.color = scaleBrightness(solidOrSampleColor, 0.30f)
+            for (step in depth downTo 1) {
+                val off = step * stepPx
+                drawIconGeometry(canvas, action, cx + off * 0.85f, cy + off, unit, iconExtrudePaint)
+            }
+
+            iconExtrudePaint.color = Color.argb(90, 255, 255, 255)
+            drawIconGeometry(canvas, action, cx - 0.5f * density, cy - 0.5f * density, unit, iconExtrudePaint)
+        }
+
+        if (shader != null && !hasRippleBoost && !isPressed) {
+            iconFacePaint.shader = shader
+            iconFacePaint.color = Color.WHITE
+        } else {
+            iconFacePaint.shader = null
+            iconFacePaint.color = if (isPressed || hasRippleBoost) {
+                blendToWhite(solidOrSampleColor, if (isPressed) 0.55f else 0.45f)
+            } else {
+                solidOrSampleColor
+            }
+        }
+
+        val glowAmt = config.letterGlow
+        if (glowAmt > 0.03f || isPressed) {
+            val radius = (3f + glowAmt * 10f + (if (isPressed) 4f else 0f)) * density
+            val glowColor = if (isPressed) blendToWhite(solidOrSampleColor, 0.4f) else solidOrSampleColor
+            iconFacePaint.setShadowLayer(radius, 0f, 0f, glowColor)
+        } else {
+            iconFacePaint.clearShadowLayer()
+        }
+
+        drawIconGeometry(canvas, action, cx, cy, unit, iconFacePaint)
+        iconFacePaint.clearShadowLayer()
+        iconFacePaint.shader = null
+    }
+
+    private fun drawIconGeometry(
+        canvas: Canvas,
+        action: KeyAction,
+        cx: Float,
+        cy: Float,
+        unit: Float,
+        paint: Paint
+    ) {
+        when (action) {
+            KeyAction.LANG_SWITCH -> {
+                val r = unit * 0.24f
+                canvas.drawCircle(cx, cy, r, paint)
+                ovalRect.set(cx - r * 0.50f, cy - r, cx + r * 0.50f, cy + r)
+                canvas.drawOval(ovalRect, paint)
+                canvas.drawLine(cx - r, cy, cx + r, cy, paint)
+                canvas.drawLine(cx, cy - r, cx, cy + r, paint)
+            }
+
+            KeyAction.BACKSPACE -> {
+                val hw = unit * 0.28f
+                val hh = hw * 0.68f
+                iconPath.reset()
+                iconPath.moveTo(cx - hw, cy)
+                iconPath.lineTo(cx - hw * 0.36f, cy - hh)
+                iconPath.lineTo(cx + hw, cy - hh)
+                iconPath.lineTo(cx + hw, cy + hh)
+                iconPath.lineTo(cx - hw * 0.36f, cy + hh)
+                iconPath.close()
+                canvas.drawPath(iconPath, paint)
+
+                val xCenter = cx + hw * 0.26f
+                val xr = hh * 0.42f
+                canvas.drawLine(xCenter - xr, cy - xr, xCenter + xr, cy + xr, paint)
+                canvas.drawLine(xCenter + xr, cy - xr, xCenter - xr, cy + xr, paint)
+            }
+
+            KeyAction.ENTER -> {
+                val hw = unit * 0.23f
+                val hh = unit * 0.14f
+                iconPath.reset()
+                iconPath.moveTo(cx + hw, cy - hh * 0.75f)
+                iconPath.lineTo(cx + hw, cy + hh * 0.45f)
+                iconPath.lineTo(cx - hw, cy + hh * 0.45f)
+                canvas.drawPath(iconPath, paint)
+
+                val tip = hh * 0.62f
+                canvas.drawLine(cx - hw, cy + hh * 0.45f, cx - hw + tip, cy + hh * 0.45f - tip, paint)
+                canvas.drawLine(cx - hw, cy + hh * 0.45f, cx - hw + tip, cy + hh * 0.45f + tip, paint)
+            }
+
+            else -> Unit
+        }
+    }
+
     private fun draw3DIlluminatedLetter(
         canvas: Canvas,
         label: String,
@@ -433,10 +588,13 @@ class KepordKeyboardView @JvmOverloads constructor(
         hasRippleBoost: Boolean
     ) {
         val baseSp = when {
-            spec.action == KeyAction.SPACE -> 11.5f
+            spec.action == KeyAction.SPACE -> 13.5f
+            spec.action == KeyAction.TO_SYMBOLS_1 ||
+                spec.action == KeyAction.TO_SYMBOLS_2 ||
+                spec.action == KeyAction.TO_ALPHA -> 12.5f
             label.length >= 4 -> 11.0f
-            label.length >= 2 -> 14.2f
-            else -> 19.5f
+            label.length >= 2 -> 14.5f
+            else -> 19.2f
         }
         val textSizePx = baseSp * spScale * config.letterSizeScale
         letterShadowPaint.textSize = textSizePx
@@ -521,7 +679,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         alternates: List<String>,
         selectedIdx: Int
     ) {
-        val cellW = max(pk.rect.width() * 1.05f, 38f * density)
+        val cellW = max(pk.rect.width() * 1.15f, 38f * density)
         val totalW = cellW * alternates.size
         val h = pk.rect.height() * 1.08f
         val center = pk.rect.centerX()
@@ -628,7 +786,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                 }
 
                 if (isLongPressOpen && ak != null && longPressAlternates.isNotEmpty()) {
-                    val cellW = max(ak.rect.width() * 1.05f, 38f * density)
+                    val cellW = max(ak.rect.width() * 1.15f, 38f * density)
                     val totalW = cellW * longPressAlternates.size
                     val left = (ak.rect.centerX() - totalW * 0.5f)
                         .coerceIn(6f * density, max(6f * density, width - totalW - 6f * density))
@@ -740,27 +898,16 @@ class KepordKeyboardView @JvmOverloads constructor(
                 layoutKeys(width, height)
             }
             KeyAction.SHIFT -> {
-                when (currentPage) {
-                    KeyboardPage.ARABIC -> {
-                        currentPage = KeyboardPage.ARABIC_SHIFT
-                        layoutKeys(width, height)
+                if (currentPage == KeyboardPage.ENGLISH) {
+                    val now = SystemClock.uptimeMillis()
+                    if (now - lastShiftTapMs < 320L && isShiftOn) {
+                        isCapsLock = !isCapsLock
+                        isShiftOn = isCapsLock
+                    } else {
+                        isCapsLock = false
+                        isShiftOn = !isShiftOn
                     }
-                    KeyboardPage.ARABIC_SHIFT -> {
-                        currentPage = KeyboardPage.ARABIC
-                        layoutKeys(width, height)
-                    }
-                    KeyboardPage.ENGLISH -> {
-                        val now = SystemClock.uptimeMillis()
-                        if (now - lastShiftTapMs < 320L && isShiftOn) {
-                            isCapsLock = !isCapsLock
-                            isShiftOn = isCapsLock
-                        } else {
-                            isCapsLock = false
-                            isShiftOn = !isShiftOn
-                        }
-                        lastShiftTapMs = now
-                    }
-                    else -> Unit
+                    lastShiftTapMs = now
                 }
             }
         }
