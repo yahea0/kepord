@@ -134,60 +134,77 @@ class KepordImePanel(
 
         buildAiDraftComposerBar()
         aiDraftBar.visibility = View.GONE
-        mainColumn.addView(aiDraftBar, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(44)))
+        mainColumn.addView(
+            aiDraftBar,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+        )
 
-        mainColumn.addView(buildTopToolbar(), LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(40)))
+        mainColumn.addView(
+            buildTopToolbar(),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(40))
+        )
 
         val divider = View(context).apply {
             setBackgroundColor(Color.rgb(34, 34, 42))
         }
-        mainColumn.addView(divider, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1))
+        mainColumn.addView(
+            divider,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+        )
 
         contentContainer.addView(
             keyboardView,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
         )
 
         buildClipboardOverlay()
         clipboardContainer.visibility = View.GONE
         contentContainer.addView(
             clipboardContainer,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(276))
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(276))
         )
 
         buildEmojiOverlay()
         emojiContainer.visibility = View.GONE
         contentContainer.addView(
             emojiContainer,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(276))
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(276))
         )
 
         buildEditToolsOverlay()
         editToolsContainer.visibility = View.GONE
         contentContainer.addView(
             editToolsContainer,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(236))
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(236))
         )
 
         buildAiChatOverlay()
         aiChatContainer.visibility = View.GONE
         contentContainer.addView(
             aiChatContainer,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(276))
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(276))
         )
 
         buildTouchpadPromptOverlay()
         touchpadFallbackContainer.visibility = View.GONE
         contentContainer.addView(
             touchpadFallbackContainer,
-            FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(246))
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(246))
         )
 
-        mainColumn.addView(contentContainer, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        mainColumn.addView(
+            contentContainer,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        )
 
-        // IMPORTANT: WRAP_CONTENT prevents InputMethodService from expanding IME window to full screen height
-        addView(mainColumn, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        addView(popupOverlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(
+            mainColumn,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+        )
+        addView(
+            popupOverlay,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+        )
 
         keyboardView.popupDelegate = object : KepordKeyboardView.PopupDelegate {
             override fun showSingleKeyPopup(
@@ -342,7 +359,7 @@ class KepordImePanel(
 
         for (msg in messages) {
             val bubble = LinearLayout(context).apply {
-                orientation = VERTICAL
+                orientation = LinearLayout.VERTICAL
                 setPadding(dp(10), dp(7), dp(10), dp(7))
                 background = if (msg.isUser) {
                     pillDrawable(Color.rgb(26, 26, 34), Color.rgb(90, 90, 108))
@@ -371,7 +388,7 @@ class KepordImePanel(
 
             if (!msg.isUser) {
                 val actRow = LinearLayout(context).apply {
-                    orientation = HORIZONTAL
+                    orientation = LinearLayout.HORIZONTAL
                     setPadding(0, dp(6), 0, 0)
                 }
                 val insertBtn = TextView(context).apply {
@@ -392,14 +409,20 @@ class KepordImePanel(
                     setPadding(dp(9), dp(4), dp(9), dp(4))
                     setOnClickListener { actions.onCopyAiReply(msg.text) }
                 }
-                actRow.addView(insertBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                    marginEnd = dp(6)
-                })
+                actRow.addView(
+                    insertBtn,
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        marginEnd = dp(6)
+                    }
+                )
                 actRow.addView(copyBtn)
                 bubble.addView(actRow)
             }
 
-            val lp = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
                 bottomMargin = dp(6)
                 if (msg.isUser) leftMargin = dp(24) else rightMargin = dp(10)
             }
@@ -444,7 +467,7 @@ class KepordImePanel(
 
     private fun buildTopToolbar(): LinearLayout {
         val bar = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.rgb(6, 6, 8))
             setPadding(dp(5), dp(4), dp(5), dp(4))
@@ -459,7 +482,10 @@ class KepordImePanel(
             background = pillDrawable(Color.rgb(20, 20, 26), Color.rgb(62, 62, 74))
             setOnClickListener { switchMode(OverlayMode.CLIPBOARD) }
         }
-        bar.addView(clipCountBadge, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.15f).apply { marginEnd = dp(3) })
+        bar.addView(
+            clipCountBadge,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.15f).apply { marginEnd = dp(3) }
+        )
 
         langBadge.apply {
             text = "AR/EN"
@@ -473,11 +499,14 @@ class KepordImePanel(
                 switchMode(OverlayMode.KEYBOARD)
             }
         }
-        bar.addView(langBadge, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.90f).apply { marginEnd = dp(3) })
+        bar.addView(
+            langBadge,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.90f).apply { marginEnd = dp(3) }
+        )
 
         bar.addView(
             toolbarBtn("😀") { switchMode(OverlayMode.EMOJI) },
-            LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.58f).apply { marginEnd = dp(3) }
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.58f).apply { marginEnd = dp(3) }
         )
 
         mouseBtn.apply {
@@ -489,7 +518,10 @@ class KepordImePanel(
             background = pillDrawable(Color.rgb(18, 18, 24), Color.rgb(75, 75, 90))
             setOnClickListener { actions.onActivateMouseTouchpad() }
         }
-        bar.addView(mouseBtn, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.95f).apply { marginEnd = dp(3) })
+        bar.addView(
+            mouseBtn,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.95f).apply { marginEnd = dp(3) }
+        )
 
         aiBtn.apply {
             text = "✨ AI"
@@ -500,11 +532,14 @@ class KepordImePanel(
             background = pillDrawable(Color.WHITE, Color.WHITE)
             setOnClickListener { switchMode(OverlayMode.AI_CHAT) }
         }
-        bar.addView(aiBtn, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.78f).apply { marginEnd = dp(3) })
+        bar.addView(
+            aiBtn,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.78f).apply { marginEnd = dp(3) }
+        )
 
         bar.addView(
             toolbarBtn("تحرير") { switchMode(OverlayMode.EDIT_TOOLS) },
-            LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.68f).apply { marginEnd = dp(3) }
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.68f).apply { marginEnd = dp(3) }
         )
 
         fontBadge.apply {
@@ -516,11 +551,14 @@ class KepordImePanel(
             background = pillDrawable(Color.rgb(18, 18, 22), Color.rgb(48, 48, 58))
             setOnClickListener { actions.onOpenSettings() }
         }
-        bar.addView(fontBadge, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 0.66f).apply { marginEnd = dp(3) })
+        bar.addView(
+            fontBadge,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.66f).apply { marginEnd = dp(3) }
+        )
 
         bar.addView(
             toolbarBtn("⚙") { actions.onOpenSettings() },
-            LinearLayout.LayoutParams(dp(32), LayoutParams.MATCH_PARENT)
+            LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.MATCH_PARENT)
         )
 
         return bar
@@ -540,7 +578,7 @@ class KepordImePanel(
 
     private fun buildAiDraftComposerBar() {
         aiDraftBar.apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.rgb(12, 12, 16))
             setPadding(dp(8), dp(5), dp(8), dp(5))
@@ -558,9 +596,12 @@ class KepordImePanel(
                 switchMode(OverlayMode.AI_CHAT)
             }
         }
-        aiDraftBar.addView(cancelBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            marginEnd = dp(6)
-        })
+        aiDraftBar.addView(
+            cancelBtn,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(6)
+            }
+        )
 
         aiDraftPreviewTv.apply {
             text = "اكتب سؤالك للذكاء الاصطناعي..."
@@ -572,9 +613,12 @@ class KepordImePanel(
             background = pillDrawable(Color.BLACK, Color.rgb(65, 65, 78))
             setPadding(dp(10), dp(6), dp(10), dp(6))
         }
-        aiDraftBar.addView(aiDraftPreviewTv, LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply {
-            marginEnd = dp(6)
-        })
+        aiDraftBar.addView(
+            aiDraftPreviewTv,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                marginEnd = dp(6)
+            }
+        )
 
         val sendBtn = TextView(context).apply {
             text = "إرسال ➤"
@@ -603,13 +647,13 @@ class KepordImePanel(
 
     private fun buildAiChatOverlay() {
         aiChatContainer.apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
 
         val header = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(5))
         }
@@ -628,7 +672,10 @@ class KepordImePanel(
                 aiModelPickerScroll.visibility = if (aiModelDropdownOpen) View.VISIBLE else View.GONE
             }
         }
-        header.addView(aiModelChip, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.35f).apply { marginEnd = dp(4) })
+        header.addView(
+            aiModelChip,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.35f).apply { marginEnd = dp(4) }
+        )
 
         aiFetchChip.apply {
             text = "↻ جلب"
@@ -639,7 +686,12 @@ class KepordImePanel(
             setPadding(dp(7), dp(5), dp(7), dp(5))
             setOnClickListener { actions.onFetchAiModels() }
         }
-        header.addView(aiFetchChip, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(4) })
+        header.addView(
+            aiFetchChip,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(4)
+            }
+        )
 
         aiWebChip.apply {
             text = "🌐 ويب ✓"
@@ -650,7 +702,12 @@ class KepordImePanel(
             setPadding(dp(7), dp(5), dp(7), dp(5))
             setOnClickListener { actions.onToggleAiWebSearch() }
         }
-        header.addView(aiWebChip, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(4) })
+        header.addView(
+            aiWebChip,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(4)
+            }
+        )
 
         aiKeysChip.apply {
             text = "🔑 0"
@@ -660,7 +717,12 @@ class KepordImePanel(
             setPadding(dp(6), dp(5), dp(6), dp(5))
             setOnClickListener { actions.onOpenSettings() }
         }
-        header.addView(aiKeysChip, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(4) })
+        header.addView(
+            aiKeysChip,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(4)
+            }
+        )
 
         val backToKbBtn = TextView(context).apply {
             text = "⌨ كيبورد"
@@ -674,15 +736,18 @@ class KepordImePanel(
         header.addView(backToKbBtn)
         aiChatContainer.addView(header)
 
-        aiModelPickerList.orientation = VERTICAL
+        aiModelPickerList.orientation = LinearLayout.VERTICAL
         aiModelPickerScroll.apply {
             visibility = View.GONE
             setBackgroundColor(Color.rgb(12, 12, 17))
             addView(aiModelPickerList)
         }
-        aiChatContainer.addView(aiModelPickerScroll, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(110)).apply {
-            bottomMargin = dp(4)
-        })
+        aiChatContainer.addView(
+            aiModelPickerScroll,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(110)).apply {
+                bottomMargin = dp(4)
+            }
+        )
 
         aiLoadingTv.apply {
             visibility = View.GONE
@@ -693,17 +758,19 @@ class KepordImePanel(
         }
         aiChatContainer.addView(aiLoadingTv)
 
-        aiMessagesList.orientation = VERTICAL
+        aiMessagesList.orientation = LinearLayout.VERTICAL
         aiMessagesScroll.addView(aiMessagesList)
-        aiChatContainer.addView(aiMessagesScroll, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        aiChatContainer.addView(aiMessagesScroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val quickRow = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(4), 0, dp(4))
         }
         quickRow.addView(
             quickAiChip("سعر الصرف اليوم") { actions.onSendAiPrompt("ما هي أسعار صرف الدولار واليورو والشيكل والدينار والريال اليوم؟ أجب بإيجاز.") },
-            LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(4) }
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(4)
+            }
         )
         quickRow.addView(
             quickAiChip("ترجم آخر منسوخ") {
@@ -714,16 +781,18 @@ class KepordImePanel(
                     actions.onSendAiPrompt("ترجم النص التالي للعربية أو الإنجليزية حسب لغته بشكل احترافي:\n$clipTxt")
                 }
             },
-            LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(4) }
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(4)
+            }
         )
         quickRow.addView(
             quickAiChip("مسح المحادثة") { actions.onClearAiChat() },
-            LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         )
         aiChatContainer.addView(quickRow)
 
         val inputRow = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         aiPromptTriggerTv.apply {
@@ -743,9 +812,12 @@ class KepordImePanel(
                 requestLayout()
             }
         }
-        inputRow.addView(aiPromptTriggerTv, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginEnd = dp(6)
-        })
+        inputRow.addView(
+            aiPromptTriggerTv,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6)
+            }
+        )
 
         val sendShortcut = TextView(context).apply {
             text = "إرسال ➤"
@@ -812,15 +884,18 @@ class KepordImePanel(
                     aiModelPickerScroll.visibility = View.GONE
                 }
             }
-            aiModelPickerList.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dp(4)
-            })
+            aiModelPickerList.addView(
+                row,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(4)
+                }
+            )
         }
     }
 
     private fun buildTouchpadPromptOverlay() {
         touchpadFallbackContainer.apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(14), dp(12), dp(14), dp(12))
             gravity = Gravity.CENTER
@@ -843,7 +918,7 @@ class KepordImePanel(
         })
 
         val btnRow = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
         val openAccBtn = TextView(context).apply {
@@ -866,22 +941,25 @@ class KepordImePanel(
             setPadding(dp(14), dp(10), dp(14), dp(10))
             setOnClickListener { switchMode(OverlayMode.KEYBOARD) }
         }
-        btnRow.addView(openAccBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            marginEnd = dp(8)
-        })
+        btnRow.addView(
+            openAccBtn,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(8)
+            }
+        )
         btnRow.addView(backBtn)
         touchpadFallbackContainer.addView(btnRow)
     }
 
     private fun buildClipboardOverlay() {
         clipboardContainer.apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
 
         val header = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(6))
         }
@@ -901,9 +979,12 @@ class KepordImePanel(
                 }
             }
             filterBtns.add(btn)
-            header.addView(btn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = dp(5)
-            })
+            header.addView(
+                btn,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    marginEnd = dp(5)
+                }
+            )
         }
 
         val spacer = View(context)
@@ -928,11 +1009,17 @@ class KepordImePanel(
             setPadding(dp(9), dp(5), dp(9), dp(5))
             setOnClickListener { switchMode(OverlayMode.KEYBOARD) }
         }
-        header.addView(closeBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            marginStart = dp(5)
-        })
+        header.addView(
+            closeBtn,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dp(5)
+            }
+        )
 
-        clipboardContainer.addView(header, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        clipboardContainer.addView(
+            header,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        )
 
         clipEmptyView.apply {
             text = "الحافظة فارغة حالياً.\nأي نص أو كود تنسخه (حتى آلاف الأسطر) سيُحفظ هنا ويبقى بعد إعادة تشغيل الهاتف."
@@ -942,14 +1029,14 @@ class KepordImePanel(
             setPadding(dp(16), dp(28), dp(16), dp(28))
             visibility = View.GONE
         }
-        clipboardContainer.addView(clipEmptyView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        clipboardContainer.addView(clipEmptyView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         clipListView.apply {
             divider = null
             dividerHeight = dp(6)
             adapter = clipAdapter
         }
-        clipboardContainer.addView(clipListView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        clipboardContainer.addView(clipListView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         applyClipFilter()
     }
@@ -978,13 +1065,13 @@ class KepordImePanel(
 
     private fun buildEmojiOverlay() {
         emojiContainer.apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }
 
         val topStrip = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(5))
         }
@@ -993,7 +1080,7 @@ class KepordImePanel(
             isHorizontalScrollBarEnabled = false
         }
         val catRow = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
@@ -1012,14 +1099,20 @@ class KepordImePanel(
                 }
             }
             emojiTabViews.add(tab)
-            catRow.addView(tab, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = dp(4)
-            })
+            catRow.addView(
+                tab,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    marginEnd = dp(4)
+                }
+            )
         }
         catScroll.addView(catRow)
-        topStrip.addView(catScroll, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginEnd = dp(6)
-        })
+        topStrip.addView(
+            catScroll,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6)
+            }
+        )
 
         val delBtn = TextView(context).apply {
             text = "⌫"
@@ -1031,9 +1124,12 @@ class KepordImePanel(
             setPadding(dp(11), dp(5), dp(11), dp(5))
             setOnClickListener { actions.onEmojiBackspace() }
         }
-        topStrip.addView(delBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            marginEnd = dp(5)
-        })
+        topStrip.addView(
+            delBtn,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dp(5)
+            }
+        )
 
         val backBtn = TextView(context).apply {
             text = "ABC"
@@ -1058,7 +1154,7 @@ class KepordImePanel(
 
         emojiGrid.columnCount = 8
         emojiScrollView.addView(emojiGrid)
-        emojiContainer.addView(emojiScrollView, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        emojiContainer.addView(emojiScrollView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         renderEmojiCategoryTabs()
         populateEmojiGrid()
@@ -1097,23 +1193,26 @@ class KepordImePanel(
 
     private fun buildEditToolsOverlay() {
         editToolsContainer.apply {
-            orientation = VERTICAL
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(10), dp(10), dp(10), dp(10))
             gravity = Gravity.CENTER_VERTICAL
         }
 
         val header = LinearLayout(context).apply {
-            orientation = HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(10))
         }
-        header.addView(TextView(context).apply {
-            text = "أدوات التحرير الدقيقة"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
-        }, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(
+            TextView(context).apply {
+                text = "أدوات التحرير الدقيقة"
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        )
 
         header.addView(TextView(context).apply {
             text = "رجوع"
@@ -1126,12 +1225,23 @@ class KepordImePanel(
         })
         editToolsContainer.addView(header)
 
-        val row1 = LinearLayout(context).apply { orientation = HORIZONTAL }
-        row1.addView(toolBigBtn("◀ يسار") { actions.onMoveCursor(-1) }, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginEnd = dp(6) })
-        row1.addView(toolBigBtn("يمين ▶") { actions.onMoveCursor(1) }, LinearLayout.LayoutParams(0, dp(52), 1f))
-        editToolsContainer.addView(row1, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) })
+        val row1 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        row1.addView(
+            toolBigBtn("◀ يسار") { actions.onMoveCursor(-1) },
+            LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginEnd = dp(6) }
+        )
+        row1.addView(
+            toolBigBtn("يمين ▶") { actions.onMoveCursor(1) },
+            LinearLayout.LayoutParams(0, dp(52), 1f)
+        )
+        editToolsContainer.addView(
+            row1,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
+            }
+        )
 
-        val row2 = LinearLayout(context).apply { orientation = HORIZONTAL }
+        val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         row2.addView(toolBigBtn("تحديد الكل") { actions.onSelectAll() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
         row2.addView(toolBigBtn("نسخ") { actions.onCopySelection() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
         row2.addView(toolBigBtn("قص") { actions.onCutSelection() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
@@ -1307,13 +1417,13 @@ class KepordImePanel(
             val root: LinearLayout
             if (convertView == null) {
                 root = LinearLayout(context).apply {
-                    orientation = HORIZONTAL
+                    orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     background = pillDrawable(Color.rgb(14, 14, 19), Color.rgb(46, 46, 56))
                     setPadding(dp(10), dp(8), dp(8), dp(8))
                 }
                 val textCol = LinearLayout(context).apply {
-                    orientation = VERTICAL
+                    orientation = LinearLayout.VERTICAL
                 }
                 val previewTv = TextView(context).apply {
                     setTextColor(Color.WHITE)
@@ -1328,7 +1438,10 @@ class KepordImePanel(
                 }
                 textCol.addView(previewTv)
                 textCol.addView(metaTv)
-                root.addView(textCol, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) })
+                root.addView(
+                    textCol,
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+                )
 
                 val pinBtn = TextView(context).apply {
                     textSize = 12f
