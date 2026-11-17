@@ -3,6 +3,7 @@ package com.kepord.ime.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.kepord.ime.ime.ArabicFontStyle
+import com.kepord.ime.ime.MechanicalSoundProfile
 import com.kepord.ime.model.Background3DStyle
 import com.kepord.ime.model.KepordConfig
 import com.kepord.ime.model.LetterColorMode
@@ -60,6 +61,7 @@ class KepordPreferences(context: Context) {
         letterSizeScale = c.letterSizeScale.coerceIn(0.80f, 1.35f),
         hapticStrengthMs = c.hapticStrengthMs.coerceIn(0, 45),
         keySoundVolume = c.keySoundVolume.coerceIn(0.1f, 1.0f),
+        touchpadSensitivity = c.touchpadSensitivity.coerceIn(0.8f, 3.5f),
         clipboardMaxUnpinned = c.clipboardMaxUnpinned.coerceIn(20, 200)
     )
 
@@ -79,6 +81,10 @@ class KepordPreferences(context: Context) {
         val arabicFont = prefs.getString("arabic_font_style", null)
             ?.let { runCatching { ArabicFontStyle.valueOf(it) }.getOrNull() }
             ?: ArabicFontStyle.NORMAL
+
+        val mechProfile = prefs.getString("mech_sound_profile", null)
+            ?.let { runCatching { MechanicalSoundProfile.valueOf(it) }.getOrNull() }
+            ?: MechanicalSoundProfile.CLICKY_BLUE
 
         return sanitize(
             KepordConfig(
@@ -107,8 +113,10 @@ class KepordPreferences(context: Context) {
                 keyPopupEnabled = prefs.getBoolean("key_popup_enabled", true),
                 spacebarCursorSwipe = prefs.getBoolean("space_cursor_swipe", true),
                 hapticStrengthMs = prefs.getInt("haptic_ms", 18),
-                keySoundEnabled = prefs.getBoolean("sound_enabled", false),
-                keySoundVolume = prefs.getFloat("sound_volume", 0.55f),
+                keySoundEnabled = prefs.getBoolean("sound_enabled", true),
+                keySoundVolume = prefs.getFloat("sound_volume", 0.75f),
+                mechanicalSoundProfile = mechProfile,
+                touchpadSensitivity = prefs.getFloat("touchpad_sensitivity", 1.65f),
                 autoCapsEnglish = prefs.getBoolean("auto_caps_en", true),
                 doubleSpacePeriod = prefs.getBoolean("double_space_period", true),
                 clipboardMaxUnpinned = prefs.getInt("clip_max_unpinned", 20),
@@ -147,6 +155,8 @@ class KepordPreferences(context: Context) {
             .putInt("haptic_ms", c.hapticStrengthMs)
             .putBoolean("sound_enabled", c.keySoundEnabled)
             .putFloat("sound_volume", c.keySoundVolume)
+            .putString("mech_sound_profile", c.mechanicalSoundProfile.name)
+            .putFloat("touchpad_sensitivity", c.touchpadSensitivity)
             .putBoolean("auto_caps_en", c.autoCapsEnglish)
             .putBoolean("double_space_period", c.doubleSpacePeriod)
             .putInt("clip_max_unpinned", c.clipboardMaxUnpinned)
