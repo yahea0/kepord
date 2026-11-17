@@ -4,4 +4,6 @@
     <string name="ime_name">Kepord Pro 3D</string>
     <string name="subtype_ar">العربية (Kepord)</string>
     <string name="subtype_en">English (Kepord)</string>
+    <string name="accessibility_service_label">Kepord Mouse &amp; Touchpad</string>
+    <string name="accessibility_service_desc">يتيح لوحة اللمس المحمولة ومؤشر الماوس على الشاشة وتحديد النص بالضغطتين الذكيتين.</string>
 </resources>
