@@ -11,16 +11,19 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.kepord.ime.KepordApplication
@@ -49,6 +52,16 @@ class KepordAccessibilityService : AccessibilityService() {
     private var dragModeEnabled = false
     private var dragModeBtn: TextView? = null
     private var isOverlayShowing = false
+
+    private val vibrator: Vibrator? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -89,7 +102,6 @@ class KepordAccessibilityService : AccessibilityService() {
         cursorX = cursorX.coerceIn(20f, (screenW - 20f).coerceAtLeast(20f))
         cursorY = cursorY.coerceIn(40f, (screenH - 40f).coerceAtLeast(40f))
 
-        // 1. Full-screen floating mouse pointer layer (non-touchable)
         val cView = CursorPointerView(this)
         val cLp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -104,7 +116,6 @@ class KepordAccessibilityService : AccessibilityService() {
             gravity = Gravity.TOP or Gravity.START
         }
 
-        // 2. Movable Laptop Touchpad Window
         val tpW = dp(248)
         val tpH = dp(188)
         val tpView = buildFloatingTouchpadView()
@@ -158,14 +169,12 @@ class KepordAccessibilityService : AccessibilityService() {
             setPadding(dp(7), dp(6), dp(7), dp(7))
         }
 
-        // Top bar with Movable Handle + Drag Toggle + Return to Normal Keyboard
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(5))
         }
 
-        // Small Move Handle Button beside the panel to move it freely anywhere on screen
         val moveBtn = TextView(this).apply {
             text = "✥ تحريك"
             setTextColor(Color.WHITE)
@@ -223,7 +232,6 @@ class KepordAccessibilityService : AccessibilityService() {
         val spacer = View(this)
         header.addView(spacer, LinearLayout.LayoutParams(0, 1, 1f))
 
-        // Return to Normal Keyboard button right beside it
         val returnKbBtn = TextView(this).apply {
             text = "⌨ كيبورد"
             setTextColor(Color.BLACK)
@@ -240,7 +248,6 @@ class KepordAccessibilityService : AccessibilityService() {
 
         root.addView(header)
 
-        // Trackpad Surface + Right-Edge Vertical Scroll Bar
         val trackRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
@@ -280,9 +287,9 @@ class KepordAccessibilityService : AccessibilityService() {
             strokeWidth = 1.2f * density
         }
         private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(125, 255, 255, 255)
+            color = Color.argb(135, 255, 255, 255)
             textAlign = Paint.Align.CENTER
-            textSize = 10.5f * resources.displayMetrics.scaledDensity
+            textSize = 9.5f * resources.displayMetrics.scaledDensity
         }
 
         private var lastX = 0f
@@ -291,12 +298,24 @@ class KepordAccessibilityService : AccessibilityService() {
         private var downY = 0f
         private var downTime = 0L
         private var movedTooMuch = false
+        private var longPressTriggered = false
 
         private var pendingTapTime = 0L
         private var pendingTapRunnable: Runnable? = null
 
         private var dragStartCursorX = 0f
         private var dragStartCursorY = 0f
+
+        private val longPressRunnable = Runnable {
+            if (!movedTooMuch && !dragModeEnabled) {
+                longPressTriggered = true
+                pendingTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                pendingTapRunnable = null
+                performTouchpadHaptic(22L)
+                flashCursor(640L)
+                dispatchLongPressAtCursor(cursorX, cursorY)
+            }
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -317,9 +336,9 @@ class KepordAccessibilityService : AccessibilityService() {
             }
             canvas.drawRoundRect(1f, 1f, w - 1f, h - 1f, 10f * density, 10f * density, borderPaint)
             canvas.drawText(
-                if (dragModeEnabled) "اسحب هنا لتمرير/تظليل الشاشة" else "نقرة = ضغط • نقرتان = تحديد نص / نقر مزدوج",
+                if (dragModeEnabled) "اسحب هنا لتمرير/تظليل الشاشة" else "نقرة = ضغط • نقرتان = تحديد نص • مطوّل = ضغط مطوّل",
                 w * 0.5f,
-                h - 9f * density,
+                h - 8f * density,
                 hintPaint
             )
         }
@@ -334,8 +353,14 @@ class KepordAccessibilityService : AccessibilityService() {
                     downY = event.y
                     downTime = SystemClock.uptimeMillis()
                     movedTooMuch = false
+                    longPressTriggered = false
                     dragStartCursorX = cursorX
                     dragStartCursorY = cursorY
+
+                    mainHandler.removeCallbacks(longPressRunnable)
+                    if (!dragModeEnabled) {
+                        mainHandler.postDelayed(longPressRunnable, 460L)
+                    }
                     return true
                 }
 
@@ -347,15 +372,24 @@ class KepordAccessibilityService : AccessibilityService() {
 
                     if (hypot(event.x - downX, event.y - downY) > 7f * density) {
                         movedTooMuch = true
+                        mainHandler.removeCallbacks(longPressRunnable)
                     }
 
-                    cursorX = (cursorX + dx * sens).coerceIn(6f, (screenW - 6f).coerceAtLeast(6f))
-                    cursorY = (cursorY + dy * sens).coerceIn(12f, (screenH - 12f).coerceAtLeast(12f))
-                    cursorView?.invalidate()
+                    if (!longPressTriggered) {
+                        cursorX = (cursorX + dx * sens).coerceIn(6f, (screenW - 6f).coerceAtLeast(6f))
+                        cursorY = (cursorY + dy * sens).coerceIn(12f, (screenH - 12f).coerceAtLeast(12f))
+                        cursorView?.invalidate()
+                    }
                     return true
                 }
 
                 MotionEvent.ACTION_UP -> {
+                    mainHandler.removeCallbacks(longPressRunnable)
+                    if (longPressTriggered) {
+                        longPressTriggered = false
+                        return true
+                    }
+
                     val elapsed = SystemClock.uptimeMillis() - downTime
                     if (dragModeEnabled && movedTooMuch) {
                         dispatchDragGesture(dragStartCursorX, dragStartCursorY, cursorX, cursorY)
@@ -365,16 +399,14 @@ class KepordAccessibilityService : AccessibilityService() {
                         return true
                     }
 
-                    if (!movedTooMuch && elapsed < 240L) {
+                    if (!movedTooMuch && elapsed < 260L) {
                         val now = SystemClock.uptimeMillis()
                         val existingPending = pendingTapRunnable
                         if (existingPending != null && (now - pendingTapTime) < 250L) {
-                            // Genuine Double Tap detected!
                             mainHandler.removeCallbacks(existingPending)
                             pendingTapRunnable = null
                             handleSmartDoubleTap(cursorX, cursorY)
                         } else {
-                            // Wait briefly to distinguish single tap vs double tap
                             pendingTapTime = now
                             val tx = cursorX
                             val ty = cursorY
@@ -386,6 +418,12 @@ class KepordAccessibilityService : AccessibilityService() {
                             mainHandler.postDelayed(run, 235L)
                         }
                     }
+                    return true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    mainHandler.removeCallbacks(longPressRunnable)
+                    longPressTriggered = false
                     return true
                 }
             }
@@ -485,10 +523,8 @@ class KepordAccessibilityService : AccessibilityService() {
     private fun handleSmartDoubleTap(x: Float, y: Float) {
         flashCursor(260L)
         if (hasSelectableTextAt(x, y)) {
-            // Select text at cursor using native press-and-hold gesture
-            dispatchLongPressForSelection(x, y)
+            dispatchLongPressAtCursor(x, y)
         } else {
-            // No text underneath -> execute two normal quick taps!
             dispatchNormalDoubleTap(x, y)
         }
     }
@@ -518,7 +554,6 @@ class KepordAccessibilityService : AccessibilityService() {
         for (win in winList) {
             if (win.type == AccessibilityNodeInfo.ACTION_FOCUS) continue
             val root = win.root ?: continue
-            // Skip Kepord's own accessibility overlay window
             if (root.packageName?.toString() == packageName && isInsideTouchpadRect(x, y)) {
                 @Suppress("DEPRECATION")
                 root.recycle()
@@ -602,10 +637,10 @@ class KepordAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun dispatchLongPressForSelection(x: Float, y: Float) {
-        withPassthroughIfNeeded(x, y, restoreDelayMs = 680L) {
+    private fun dispatchLongPressAtCursor(x: Float, y: Float) {
+        withPassthroughIfNeeded(x, y, restoreDelayMs = 700L) {
             val p = Path().apply { moveTo(x, y) }
-            val stroke = GestureDescription.StrokeDescription(p, 0L, 580L)
+            val stroke = GestureDescription.StrokeDescription(p, 0L, 620L)
             dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
         }
     }
@@ -646,6 +681,15 @@ class KepordAccessibilityService : AccessibilityService() {
             }, 25L)
         } else {
             action()
+        }
+    }
+
+    private fun performTouchpadHaptic(ms: Long) {
+        val vib = vibrator ?: return
+        if (!vib.hasVibrator()) return
+        try {
+            vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (_: Throwable) {
         }
     }
 
