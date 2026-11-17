@@ -1,6 +1,7 @@
 package com.kepord.ime.model
 
 import com.kepord.ime.ime.ArabicFontStyle
+import com.kepord.ime.ime.MechanicalSoundProfile
 
 enum class LetterColorMode(val titleAr: String, val descAr: String) {
     STATIC("لون ثابت للحرف", "تخصيص لون واحد ساطع للأحرف فقط"),
@@ -53,8 +54,10 @@ data class KepordConfig(
     val keyPopupEnabled: Boolean = true,
     val spacebarCursorSwipe: Boolean = true,
     val hapticStrengthMs: Int = 18,
-    val keySoundEnabled: Boolean = false,
-    val keySoundVolume: Float = 0.55f,
+    val keySoundEnabled: Boolean = true,
+    val keySoundVolume: Float = 0.75f,
+    val mechanicalSoundProfile: MechanicalSoundProfile = MechanicalSoundProfile.CLICKY_BLUE,
+    val touchpadSensitivity: Float = 1.65f,
     val autoCapsEnglish: Boolean = true,
     val doubleSpacePeriod: Boolean = true,
 
