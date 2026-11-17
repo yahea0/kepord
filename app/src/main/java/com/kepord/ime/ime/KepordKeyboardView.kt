@@ -11,7 +11,6 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
-import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -47,6 +46,21 @@ class KepordKeyboardView @JvmOverloads constructor(
         fun onOpenClipboard()
     }
 
+    interface PopupDelegate {
+        fun showSingleKeyPopup(
+            anchorRectInKb: RectF,
+            label: String,
+            color: Int,
+            config: KepordConfig
+        )
+        fun showLongPressPopup(
+            anchorRectInKb: RectF,
+            alternates: List<String>,
+            selectedIndex: Int
+        )
+        fun hidePopup()
+    }
+
     private class PlacedKey(
         val spec: KeySpec,
         val rect: RectF,
@@ -63,6 +77,8 @@ class KepordKeyboardView @JvmOverloads constructor(
     }
 
     var listener: Listener? = null
+    var popupDelegate: PopupDelegate? = null
+    var soundEngine: MechanicalSoundEngine? = null
 
     private var config = KepordConfig()
     private var currentPage = KeyboardPage.ARABIC
@@ -173,10 +189,6 @@ class KepordKeyboardView @JvmOverloads constructor(
         }
     }
 
-    private val audioManager: AudioManager? by lazy {
-        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-    }
-
     private var isAttachedAndVisible = true
 
     private val longPressRunnable = Runnable {
@@ -186,6 +198,7 @@ class KepordKeyboardView @JvmOverloads constructor(
             longPressAlternates = key.spec.alternates
             longPressSelectedIndex = 0
             performHaptic(12)
+            updateExternalPopup()
             invalidate()
         }
     }
@@ -209,6 +222,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         val prevShowNum = config.showNumberRow
         val prevScale = config.keyboardHeightScale
         config = newConfig
+        soundEngine?.preloadProfileAsync(newConfig.mechanicalSoundProfile)
         if (forceDefaultLanguage) {
             currentPage = if (newConfig.defaultLanguageArabic) KeyboardPage.ARABIC else KeyboardPage.ENGLISH
             lastAlphaPage = currentPage
@@ -233,7 +247,11 @@ class KepordKeyboardView @JvmOverloads constructor(
 
     fun setActiveWindowVisibility(visible: Boolean) {
         isAttachedAndVisible = visible
-        if (visible) invalidate()
+        if (!visible) {
+            popupDelegate?.hidePopup()
+        } else {
+            invalidate()
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -246,6 +264,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         super.onDetachedFromWindow()
         isAttachedAndVisible = false
         handler.removeCallbacksAndMessages(null)
+        popupDelegate?.hidePopup()
         bgRenderer.release()
     }
 
@@ -447,17 +466,44 @@ class KepordKeyboardView @JvmOverloads constructor(
             }
         }
 
-        val ak = activeKey
-        if (ak != null) {
-            if (isLongPressOpen && longPressAlternates.isNotEmpty()) {
-                drawLongPressPopup(canvas, ak, longPressAlternates, longPressSelectedIndex)
-            } else if (config.keyPopupEnabled && ak.spec.action == KeyAction.CHAR) {
-                drawSingleKeyPopup(canvas, ak)
+        // Fallback local popup draw only when external full-panel overlay is absent (e.g. inside Settings Preview)
+        if (popupDelegate == null) {
+            val ak = activeKey
+            if (ak != null) {
+                if (isLongPressOpen && longPressAlternates.isNotEmpty()) {
+                    drawLocalLongPressPopup(canvas, ak, longPressAlternates, longPressSelectedIndex)
+                } else if (config.keyPopupEnabled && ak.spec.action == KeyAction.CHAR) {
+                    drawLocalSingleKeyPopup(canvas, ak)
+                }
             }
         }
 
         if (isAttachedAndVisible && (isAnimatedMode || hasActiveRipple)) {
             postInvalidateOnAnimation()
+        }
+    }
+
+    private fun updateExternalPopup() {
+        val delegate = popupDelegate ?: return
+        val ak = activeKey
+        if (ak == null) {
+            delegate.hidePopup()
+            return
+        }
+        if (isLongPressOpen && longPressAlternates.isNotEmpty()) {
+            delegate.showLongPressPopup(ak.rect, longPressAlternates, longPressSelectedIndex)
+        } else if (config.keyPopupEnabled && ak.spec.action == KeyAction.CHAR) {
+            val color = evaluateKeyColor(
+                ak,
+                ak.orderIndex,
+                placedKeys.size.coerceAtLeast(1),
+                ((SystemClock.uptimeMillis() % 60000L) / 1000f) * config.waveSpeed * 0.65f,
+                SystemClock.uptimeMillis(),
+                true
+            )
+            delegate.showSingleKeyPopup(ak.rect, resolveKeyLabel(ak.spec), color, config)
+        } else {
+            delegate.hidePopup()
         }
     }
 
@@ -651,7 +697,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         letterFacePaint.shader = null
     }
 
-    private fun drawSingleKeyPopup(canvas: Canvas, pk: PlacedKey) {
+    private fun drawLocalSingleKeyPopup(canvas: Canvas, pk: PlacedKey) {
         val w = pk.rect.width() * 1.25f
         val h = pk.rect.height() * 1.15f
         val cx = pk.rect.centerX().coerceIn(w * 0.5f + 4f, width - w * 0.5f - 4f)
@@ -673,7 +719,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         draw3DIlluminatedLetter(canvas, label, popupRect, pk.spec, color, null, true, false)
     }
 
-    private fun drawLongPressPopup(
+    private fun drawLocalLongPressPopup(
         canvas: Canvas,
         pk: PlacedKey,
         alternates: List<String>,
@@ -740,7 +786,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                 activeKey = hit
                 if (hit != null) {
                     performHaptic(config.hapticStrengthMs)
-                    playKeyClickSound()
+                    playMechanicalSound()
                     spawnRipple(hit.rect.centerX(), hit.rect.centerY())
 
                     if (hit.spec.action == KeyAction.BACKSPACE) {
@@ -751,6 +797,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                         handler.postDelayed(longPressRunnable, 360L)
                     }
                 }
+                updateExternalPopup()
                 invalidate()
                 return true
             }
@@ -794,6 +841,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                     if (rel != longPressSelectedIndex) {
                         longPressSelectedIndex = rel
                         performHaptic(6)
+                        updateExternalPopup()
                         invalidate()
                     }
                     return true
@@ -808,6 +856,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                     if (movedKey.spec.action == KeyAction.CHAR && movedKey.spec.alternates.size > 1) {
                         handler.postDelayed(longPressRunnable, 360L)
                     }
+                    updateExternalPopup()
                     invalidate()
                 }
                 return true
@@ -834,6 +883,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                 activeKey = null
                 activePointerId = MotionEvent.INVALID_POINTER_ID
                 isLongPressOpen = false
+                popupDelegate?.hidePopup()
                 invalidate()
                 return true
             }
@@ -844,6 +894,7 @@ class KepordKeyboardView @JvmOverloads constructor(
                 activeKey = null
                 activePointerId = MotionEvent.INVALID_POINTER_ID
                 isLongPressOpen = false
+                popupDelegate?.hidePopup()
                 invalidate()
                 return true
             }
@@ -861,6 +912,7 @@ class KepordKeyboardView @JvmOverloads constructor(
         }
         activeKey = null
         isLongPressOpen = false
+        popupDelegate?.hidePopup()
     }
 
     private fun executeKeyAction(spec: KeySpec) {
@@ -1158,11 +1210,8 @@ class KepordKeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun playKeyClickSound() {
+    private fun playMechanicalSound() {
         if (!config.keySoundEnabled) return
-        try {
-            audioManager?.playSoundEffect(AudioManager.FX_KEY_CLICK, config.keySoundVolume)
-        } catch (_: Throwable) {
-        }
+        soundEngine?.playKeyClick(config.mechanicalSoundProfile, config.keySoundVolume)
     }
 }
