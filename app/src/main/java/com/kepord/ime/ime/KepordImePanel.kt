@@ -85,9 +85,7 @@ class KepordImePanel(
         orientation = LinearLayout.VERTICAL
         setBackgroundColor(Color.BLACK)
     }
-    private val popupOverlay = FloatingKeyPopupOverlay(context).apply {
-        translationZ = 24f * density
-    }
+    private val popupOverlay = FloatingKeyPopupOverlay(context)
 
     val keyboardView = KepordKeyboardView(context)
     private val contentContainer = FrameLayout(context)
@@ -128,19 +126,17 @@ class KepordImePanel(
     private var aiModelDropdownOpen = false
 
     init {
+        layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
         setBackgroundColor(Color.BLACK)
 
         buildAiDraftComposerBar()
         aiDraftBar.visibility = View.GONE
-        mainColumn.addView(
-            aiDraftBar,
-            LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(44))
-        )
+        mainColumn.addView(aiDraftBar, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(44)))
 
-        mainColumn.addView(
-            buildTopToolbar(),
-            LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(40))
-        )
+        mainColumn.addView(buildTopToolbar(), LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(40)))
 
         val divider = View(context).apply {
             setBackgroundColor(Color.rgb(34, 34, 42))
@@ -187,13 +183,11 @@ class KepordImePanel(
             FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(246))
         )
 
-        mainColumn.addView(
-            contentContainer,
-            LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        )
+        mainColumn.addView(contentContainer, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
-        addView(mainColumn, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        addView(popupOverlay, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        // IMPORTANT: WRAP_CONTENT prevents InputMethodService from expanding IME window to full screen height
+        addView(mainColumn, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(popupOverlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         keyboardView.popupDelegate = object : KepordKeyboardView.PopupDelegate {
             override fun showSingleKeyPopup(
@@ -217,6 +211,33 @@ class KepordImePanel(
                 popupOverlay.clear()
             }
         }
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val widthSize = MeasureSpec.getSize(widthMeasureSpec)
+        val heightMode = MeasureSpec.getMode(heightMeasureSpec)
+        val heightSize = MeasureSpec.getSize(heightMeasureSpec)
+
+        val childHeightSpec = if (heightMode == MeasureSpec.UNSPECIFIED) {
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        } else {
+            MeasureSpec.makeMeasureSpec(heightSize, MeasureSpec.AT_MOST)
+        }
+
+        mainColumn.measure(
+            MeasureSpec.makeMeasureSpec(widthSize, MeasureSpec.EXACTLY),
+            childHeightSpec
+        )
+
+        val measuredW = mainColumn.measuredWidth
+        val measuredH = mainColumn.measuredHeight
+
+        popupOverlay.measure(
+            MeasureSpec.makeMeasureSpec(measuredW, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(measuredH, MeasureSpec.EXACTLY)
+        )
+
+        setMeasuredDimension(measuredW, measuredH)
     }
 
     fun applyConfig(config: KepordConfig, forceDefaultLang: Boolean) {
@@ -321,7 +342,7 @@ class KepordImePanel(
 
         for (msg in messages) {
             val bubble = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
+                orientation = VERTICAL
                 setPadding(dp(10), dp(7), dp(10), dp(7))
                 background = if (msg.isUser) {
                     pillDrawable(Color.rgb(26, 26, 34), Color.rgb(90, 90, 108))
@@ -350,7 +371,7 @@ class KepordImePanel(
 
             if (!msg.isUser) {
                 val actRow = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
+                    orientation = HORIZONTAL
                     setPadding(0, dp(6), 0, 0)
                 }
                 val insertBtn = TextView(context).apply {
@@ -371,12 +392,9 @@ class KepordImePanel(
                     setPadding(dp(9), dp(4), dp(9), dp(4))
                     setOnClickListener { actions.onCopyAiReply(msg.text) }
                 }
-                actRow.addView(
-                    insertBtn,
-                    LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-                        marginEnd = dp(6)
-                    }
-                )
+                actRow.addView(insertBtn, LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                    marginEnd = dp(6)
+                })
                 actRow.addView(copyBtn)
                 bubble.addView(actRow)
             }
@@ -397,21 +415,6 @@ class KepordImePanel(
         isComposingAiPrompt = false
         aiDraftBar.visibility = View.GONE
         actions.onAiComposerModeChanged(false)
-    }
-
-    private fun startComposingAiPrompt() {
-        mode = OverlayMode.KEYBOARD
-        isComposingAiPrompt = true
-        aiDraftBar.visibility = View.VISIBLE
-        keyboardView.visibility = View.VISIBLE
-        clipboardContainer.visibility = View.GONE
-        emojiContainer.visibility = View.GONE
-        editToolsContainer.visibility = View.GONE
-        aiChatContainer.visibility = View.GONE
-        touchpadFallbackContainer.visibility = View.GONE
-        keyboardView.setActiveWindowVisibility(true)
-        actions.onAiComposerModeChanged(true)
-        refreshAiDraftUi()
     }
 
     fun switchMode(newMode: OverlayMode) {
@@ -436,11 +439,12 @@ class KepordImePanel(
             renderEmojiCategoryTabs()
             populateEmojiGrid()
         }
+        requestLayout()
     }
 
     private fun buildTopToolbar(): LinearLayout {
         val bar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.rgb(6, 6, 8))
             setPadding(dp(5), dp(4), dp(5), dp(4))
@@ -536,7 +540,7 @@ class KepordImePanel(
 
     private fun buildAiDraftComposerBar() {
         aiDraftBar.apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(Color.rgb(12, 12, 16))
             setPadding(dp(8), dp(5), dp(8), dp(5))
@@ -599,13 +603,13 @@ class KepordImePanel(
 
     private fun buildAiChatOverlay() {
         aiChatContainer.apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
 
         val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(5))
         }
@@ -670,7 +674,7 @@ class KepordImePanel(
         header.addView(backToKbBtn)
         aiChatContainer.addView(header)
 
-        aiModelPickerList.orientation = LinearLayout.VERTICAL
+        aiModelPickerList.orientation = VERTICAL
         aiModelPickerScroll.apply {
             visibility = View.GONE
             setBackgroundColor(Color.rgb(12, 12, 17))
@@ -689,12 +693,12 @@ class KepordImePanel(
         }
         aiChatContainer.addView(aiLoadingTv)
 
-        aiMessagesList.orientation = LinearLayout.VERTICAL
+        aiMessagesList.orientation = VERTICAL
         aiMessagesScroll.addView(aiMessagesList)
         aiChatContainer.addView(aiMessagesScroll, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
 
         val quickRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             setPadding(0, dp(4), 0, dp(4))
         }
         quickRow.addView(
@@ -719,7 +723,7 @@ class KepordImePanel(
         aiChatContainer.addView(quickRow)
 
         val inputRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
         aiPromptTriggerTv.apply {
@@ -730,7 +734,14 @@ class KepordImePanel(
             ellipsize = TextUtils.TruncateAt.END
             background = pillDrawable(Color.rgb(16, 16, 22), Color.WHITE)
             setPadding(dp(10), dp(8), dp(10), dp(8))
-            setOnClickListener { startComposingAiPrompt() }
+            setOnClickListener {
+                switchMode(OverlayMode.KEYBOARD)
+                isComposingAiPrompt = true
+                aiDraftBar.visibility = View.VISIBLE
+                actions.onAiComposerModeChanged(true)
+                refreshAiDraftUi()
+                requestLayout()
+            }
         }
         inputRow.addView(aiPromptTriggerTv, LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
             marginEnd = dp(6)
@@ -751,7 +762,7 @@ class KepordImePanel(
                     refreshAiDraftUi()
                     actions.onSendAiPrompt(txt)
                 } else {
-                    startComposingAiPrompt()
+                    aiPromptTriggerTv.performClick()
                 }
             }
         }
@@ -809,7 +820,7 @@ class KepordImePanel(
 
     private fun buildTouchpadPromptOverlay() {
         touchpadFallbackContainer.apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(14), dp(12), dp(14), dp(12))
             gravity = Gravity.CENTER
@@ -824,7 +835,7 @@ class KepordImePanel(
         })
 
         touchpadFallbackContainer.addView(TextView(context).apply {
-            text = "لإظهار مؤشر الماوس والتحكم في كامل الشاشة وتحديد النص بالضغطتين الذكيتين:\n1) فعّل «Kepord Mouse & Touchpad» من إعدادات إمكانية الوصول.\n2) على Android 13 (Realme): إن ظهر الخيار باهتاً، افتح معلومات التطبيق ← ⋮ بالأعلى ← السماح بالإعدادات المقيدة."
+            text = "لإظهار مؤشر الماوس والتحكم في كامل الشاشة وتحديد النص بالضغطتين والضغط المطول:\n1) فعّل «Kepord Mouse & Touchpad» من إعدادات إمكانية الوصول.\n2) على Android 13 (Realme): إن ظهر الخيار باهتاً، افتح معلومات التطبيق ← ⋮ بالأعلى ← السماح بالإعدادات المقيدة."
             setTextColor(Color.rgb(190, 190, 205))
             textSize = 11.5f
             gravity = Gravity.CENTER
@@ -832,7 +843,7 @@ class KepordImePanel(
         })
 
         val btnRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER
         }
         val openAccBtn = TextView(context).apply {
@@ -864,13 +875,13 @@ class KepordImePanel(
 
     private fun buildClipboardOverlay() {
         clipboardContainer.apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(8), dp(6), dp(8), dp(6))
         }
 
         val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(6))
         }
@@ -967,13 +978,13 @@ class KepordImePanel(
 
     private fun buildEmojiOverlay() {
         emojiContainer.apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }
 
         val topStrip = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(5))
         }
@@ -982,7 +993,7 @@ class KepordImePanel(
             isHorizontalScrollBarEnabled = false
         }
         val catRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
 
@@ -1086,14 +1097,14 @@ class KepordImePanel(
 
     private fun buildEditToolsOverlay() {
         editToolsContainer.apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = VERTICAL
             setBackgroundColor(Color.rgb(5, 5, 7))
             setPadding(dp(10), dp(10), dp(10), dp(10))
             gravity = Gravity.CENTER_VERTICAL
         }
 
         val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(10))
         }
@@ -1115,12 +1126,12 @@ class KepordImePanel(
         })
         editToolsContainer.addView(header)
 
-        val row1 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val row1 = LinearLayout(context).apply { orientation = HORIZONTAL }
         row1.addView(toolBigBtn("◀ يسار") { actions.onMoveCursor(-1) }, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginEnd = dp(6) })
         row1.addView(toolBigBtn("يمين ▶") { actions.onMoveCursor(1) }, LinearLayout.LayoutParams(0, dp(52), 1f))
         editToolsContainer.addView(row1, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) })
 
-        val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val row2 = LinearLayout(context).apply { orientation = HORIZONTAL }
         row2.addView(toolBigBtn("تحديد الكل") { actions.onSelectAll() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
         row2.addView(toolBigBtn("نسخ") { actions.onCopySelection() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
         row2.addView(toolBigBtn("قص") { actions.onCutSelection() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
@@ -1296,13 +1307,13 @@ class KepordImePanel(
             val root: LinearLayout
             if (convertView == null) {
                 root = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
+                    orientation = HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     background = pillDrawable(Color.rgb(14, 14, 19), Color.rgb(46, 46, 56))
                     setPadding(dp(10), dp(8), dp(8), dp(8))
                 }
                 val textCol = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
+                    orientation = VERTICAL
                 }
                 val previewTv = TextView(context).apply {
                     setTextColor(Color.WHITE)
