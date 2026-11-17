@@ -1,16 +1,16 @@
 package com.kepord.ime.ime
 
 enum class ArabicFontStyle(val titleAr: String, val descAr: String) {
-    NORMAL("1. خط النسخ الأصيل (العادي)", "كتابة عربية طبيعية بدون أي زخرفة"),
-    DIWANI_MAMDUD("2. الخط الديواني الممدود", "وصلات تطويل انسيابية متوازنة بين الأحرف المتصلة"),
-    THULUTH_ROYAL("3. خط الثلث الملوكي", "مدّات ثلثية عريضة وفخمة تحافظ على ربط الكلمة"),
-    NASTALIQ_FARSI("4. خط النستعليق / الفارسي", "أحرف كـ/يـ/هـ الفارسية الانسيابية في الكتابة"),
-    NASTALIQ_FLOW("5. النستعليق الممدود", "يمزج رسم النستعليق مع التطويل الانسيابي"),
-    RUQAH_BALANCED("6. خط الرقعة المتناغم", "تطويل انتقائي للأحرف الأفقية العريضة فقط"),
-    KUFI_GEOMETRIC("7. الخط الكوفي الهندسي", "أحرف كوفية هندسية منفصلة ومتباعدة بوضوح"),
-    ANDALUSI_ORNATE("8. الخط الأندلسي المزخرف", "تطويل متوازن مع سكون خفيف على الأحرف العريضة"),
-    CROWN_ALIF("9. خط التاج السامي", "تطويل مع ألف خنجرية لطيفة على الأحرف المميزة"),
-    MODERN_CALLIGRAPHY("10. الخط العصري الفاخر", "دمج اللمسة الفارسية مع مدّات عريضة أنيقة")
+    NORMAL("1. خط النسخ الأصيل (العادي)", "كتابة عربية طبيعية واضحة بدون أي تغيير"),
+    UTHMANI("2. الخط العثماني (رسم المصحف)", "ألف الوصل ٱ والسكون العثماني ۡ والألف الخنجرية ٰ"),
+    RUQAH("3. خط الرقعة الأصيل", "حروف متراصة ورشيقة كخط الرقعة اليدوي السريع"),
+    HANDWRITING("4. خط اليد الحر", "تشكيل ولمسات قلم يدوية متدفقة وانسيابية"),
+    DIWANI("5. الخط الديواني الملكي", "وصلات مقوّسة وانسيابية ديوانية فخمة"),
+    THULUTH("6. خط الثلث الكلاسيكي", "امتدادات كلاسيكية متوازنة وعريضة"),
+    KUFI("7. الخط الكوفي الهندسي", "أحرف كوفية هندسية منفصلة ومتناسقة"),
+    FARSI_NASTALIQ("8. الخط الفارسي (النستعليق)", "أحرف ک ی ے ہ الفارسية الانسيابية"),
+    MAGHREBI("9. الخط المغربي / الأندلسي", "لمسة مغربية أندلسية عريقة ومتزنة"),
+    ORNATE_LUXURY("10. الخط المزخرف الفاخر", "زخرفة خطية أنيقة تحافظ على وضوح القراءة")
 }
 
 object ArabicFontEngine {
@@ -18,15 +18,23 @@ object ArabicFontEngine {
     private val dualJoining = setOf(
         'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'س', 'ش', 'ص', 'ض',
         'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن',
-        'ه', 'ي', 'ئ', 'ک', 'ی'
+        'ه', 'ي', 'ئ', 'ک', 'ی', 'ھ'
     )
 
     private val wideLetters = setOf(
         'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ف', 'ق', 'ك', 'ل', 'م', 'ک'
     )
 
+    private val sweepLetters = setOf(
+        'س', 'ش', 'ص', 'ض'
+    )
+
+    private val handwritingAnchors = setOf(
+        'ب', 'ت', 'ن', 'ي', 'م', 'ی'
+    )
+
     private val arabicLetters = setOf(
-        'ا', 'أ', 'إ', 'آ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ',
+        'ا', 'أ', 'إ', 'آ', 'ٱ', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ',
         'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ',
         'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و',
         'ؤ', 'ي', 'ئ', 'ى', 'ة', 'ء'
@@ -43,12 +51,33 @@ object ArabicFontEngine {
         'ء' to 'ﺀ'
     )
 
+    private val diacriticsAndMarks = setOf(
+        '\u064E', '\u064B', '\u064F', '\u064C', '\u0650', '\u064D',
+        '\u0651', '\u0652', '\u0670', '\u06E1', '\u0654'
+    )
+
     private fun mapNastaliqChar(ch: Char): Char = when (ch) {
         'ك' -> 'ک'
         'ي' -> 'ی'
         'ى' -> 'ے'
         'ه' -> 'ہ'
         'ة' -> 'ۃ'
+        else -> ch
+    }
+
+    private fun mapRuqahChar(ch: Char): Char = when (ch) {
+        'ك' -> 'ک'
+        'ي' -> 'ی'
+        'ى' -> 'ے'
+        'ه' -> 'ھ'
+        else -> ch
+    }
+
+    private fun mapUthmaniChar(ch: Char, prev: Char?): Char = when {
+        ch == 'ا' && (prev == null || prev.isWhitespace()) -> 'ٱ'
+        ch == 'ك' -> 'ک'
+        ch == 'ي' -> 'ی'
+        ch == 'ى' -> 'ی'
         else -> ch
     }
 
@@ -59,30 +88,21 @@ object ArabicFontEngine {
     ): String {
         if (style == ArabicFontStyle.NORMAL || input.isEmpty()) return input
 
-        val prev = textBeforeCursor.lastOrNull { it !in '\u064B'..'\u0652' }
+        val prev = textBeforeCursor.lastOrNull { it !in diacriticsAndMarks && it != '\u0640' && it != '\u2009' }
+        val prevImmediate = textBeforeCursor.lastOrNull()
 
         if (input == "لا") {
+            val canJoin = prevImmediate != null && prevImmediate in dualJoining
             return when (style) {
-                ArabicFontStyle.DIWANI_MAMDUD,
-                ArabicFontStyle.NASTALIQ_FLOW -> if (prev != null && prev in dualJoining) "\u0640لا" else "لا"
-                ArabicFontStyle.THULUTH_ROYAL -> if (prev != null && prev in dualJoining) "\u0640\u0640لا" else "لا"
-                ArabicFontStyle.RUQAH_BALANCED,
-                ArabicFontStyle.MODERN_CALLIGRAPHY -> if (prev != null && prev in wideLetters) "\u0640لا" else "لا"
-                ArabicFontStyle.ANDALUSI_ORNATE -> when {
-                    prev == null || prev !in dualJoining -> "لا"
-                    prev in wideLetters -> "\u0652\u0640لا"
-                    else -> "\u0640لا"
-                }
-                ArabicFontStyle.CROWN_ALIF -> when {
-                    prev == null || prev !in dualJoining -> "لا"
-                    prev in wideLetters -> "\u0670\u0640لا"
-                    else -> "\u0640لا"
-                }
-                ArabicFontStyle.KUFI_GEOMETRIC -> {
-                    val lastRaw = textBeforeCursor.lastOrNull()
-                    val prefix = if (lastRaw != null && !lastRaw.isWhitespace()) "\u2009" else ""
+                ArabicFontStyle.DIWANI -> if (canJoin) "\u0640لا" else "لا"
+                ArabicFontStyle.THULUTH -> if (canJoin) "\u0640\u0640لا" else "لا"
+                ArabicFontStyle.KUFI -> {
+                    val prefix = if (prevImmediate != null && !prevImmediate.isWhitespace()) "\u2009" else ""
                     "${prefix}ﻝ\u2009ﺍ"
                 }
+                ArabicFontStyle.UTHMANI -> if (canJoin) "\u06E1لا" else "لا"
+                ArabicFontStyle.RUQAH -> if (prev != null && prev in sweepLetters) "\u0640لا" else "لا"
+                ArabicFontStyle.ORNATE_LUXURY -> if (canJoin) "\u0670\u0640لا" else "لا"
                 else -> "لا"
             }
         }
@@ -96,53 +116,86 @@ object ArabicFontEngine {
         return when (style) {
             ArabicFontStyle.NORMAL -> input
 
-            ArabicFontStyle.DIWANI_MAMDUD -> {
-                if (prev != null && prev in dualJoining && !isLamAlif) "\u0640$ch" else input
+            ArabicFontStyle.UTHMANI -> {
+                val mapped = mapUthmaniChar(ch, prevImmediate)
+                val isAfterLam = prev == 'ل' && (ch == 'ا' || ch == 'ه')
+                val uthmaniAccent = when {
+                    isLamAlif || isAfterLam -> ""
+                    prev != null && prev in setOf('ن', 'م', 'س', 'ع', 'ل') && prevImmediate in dualJoining -> "\u06E1"
+                    prev != null && prev in setOf('ر', 'ح', 'ق') -> "\u0670"
+                    else -> ""
+                }
+                "$uthmaniAccent$mapped"
             }
 
-            ArabicFontStyle.THULUTH_ROYAL -> {
-                if (prev != null && prev in dualJoining && !isLamAlif) "\u0640\u0640$ch" else input
+            ArabicFontStyle.RUQAH -> {
+                val mapped = mapRuqahChar(ch)
+                if (prevImmediate != null && prevImmediate in sweepLetters && !isLamAlif) {
+                    "\u0640$mapped"
+                } else {
+                    mapped.toString()
+                }
             }
 
-            ArabicFontStyle.NASTALIQ_FARSI -> {
-                mapNastaliqChar(ch).toString()
-            }
-
-            ArabicFontStyle.NASTALIQ_FLOW -> {
+            ArabicFontStyle.HANDWRITING -> {
                 val mapped = mapNastaliqChar(ch)
-                if (prev != null && prev in dualJoining && !isLamAlif) "\u0640$mapped" else mapped.toString()
+                val penSweep = if (prevImmediate != null && prevImmediate in handwritingAnchors && !isLamAlif) {
+                    "\u0640"
+                } else {
+                    ""
+                }
+                val penAccent = when {
+                    isLamAlif || prev == null || prev.isWhitespace() -> ""
+                    ch == 'م' || ch == 'ن' -> "\u064E"
+                    ch == 'ب' || ch == 'ت' -> "\u0650"
+                    else -> ""
+                }
+                "$penSweep$mapped$penAccent"
             }
 
-            ArabicFontStyle.RUQAH_BALANCED -> {
-                if (prev != null && prev in wideLetters && !isLamAlif) "\u0640$ch" else input
+            ArabicFontStyle.DIWANI -> {
+                val mapped = mapRuqahChar(ch)
+                if (prevImmediate != null && prevImmediate in dualJoining && !isLamAlif) {
+                    "\u0640$mapped"
+                } else {
+                    mapped.toString()
+                }
             }
 
-            ArabicFontStyle.KUFI_GEOMETRIC -> {
+            ArabicFontStyle.THULUTH -> {
+                if (prevImmediate != null && prevImmediate in dualJoining && !isLamAlif) {
+                    "\u0640\u0640$ch"
+                } else {
+                    input
+                }
+            }
+
+            ArabicFontStyle.KUFI -> {
                 val iso = kufiIsolated[ch] ?: ch
-                val lastRaw = textBeforeCursor.lastOrNull()
-                val prefix = if (lastRaw != null && !lastRaw.isWhitespace()) "\u2009" else ""
+                val prefix = if (prevImmediate != null && !prevImmediate.isWhitespace()) "\u2009" else ""
                 "$prefix$iso"
             }
 
-            ArabicFontStyle.ANDALUSI_ORNATE -> {
-                if (prev != null && prev in dualJoining && !isLamAlif) {
-                    if (prev in wideLetters) "\u0652\u0640$ch" else "\u0640$ch"
+            ArabicFontStyle.FARSI_NASTALIQ -> {
+                mapNastaliqChar(ch).toString()
+            }
+
+            ArabicFontStyle.MAGHREBI -> {
+                val mapped = if (ch == 'ي') 'ی' else ch
+                if (prevImmediate != null && prevImmediate in dualJoining && !isLamAlif) {
+                    if (prevImmediate in wideLetters) "\u0652\u0640$mapped" else "\u0640$mapped"
                 } else {
-                    input
+                    mapped.toString()
                 }
             }
 
-            ArabicFontStyle.CROWN_ALIF -> {
-                if (prev != null && prev in dualJoining && !isLamAlif) {
-                    if (prev in wideLetters) "\u0670\u0640$ch" else "\u0640$ch"
-                } else {
-                    input
-                }
-            }
-
-            ArabicFontStyle.MODERN_CALLIGRAPHY -> {
+            ArabicFontStyle.ORNATE_LUXURY -> {
                 val mapped = mapNastaliqChar(ch)
-                if (prev != null && prev in wideLetters && !isLamAlif) "\u0640$mapped" else mapped.toString()
+                if (prevImmediate != null && prevImmediate in dualJoining && !isLamAlif) {
+                    if (prevImmediate in wideLetters) "\u0670\u0640$mapped" else "\u0640$mapped"
+                } else {
+                    mapped.toString()
+                }
             }
         }
     }
@@ -155,26 +208,35 @@ object ArabicFontEngine {
         val last = textBeforeCursor.last()
         if (Character.isLowSurrogate(last)) return 1
 
-        var idx = textBeforeCursor.length - 2
-        var extra = 0
-        while (idx >= 0) {
-            val c = textBeforeCursor[idx]
-            val isFontConnector = c == '\u0640' || c == '\u2009' || c == '\u0652' || c == '\u0670'
+        var deleteCount = 1
+        var idx = textBeforeCursor.length - 1
+
+        // If cursor is right on a trailing font diacritic (like Handwriting accent), consume the base letter behind it too
+        if (last in diacriticsAndMarks) {
+            idx--
+            if (idx >= 0) deleteCount++
+        }
+
+        // Clean up any font-injected connectors/ornaments immediately preceding the deleted letter
+        var scan = idx - 1
+        while (scan >= 0) {
+            val c = textBeforeCursor[scan]
+            val isFontConnector = c == '\u0640' || c == '\u2009' || c in diacriticsAndMarks
             if (isFontConnector) {
-                extra++
-                idx--
+                deleteCount++
+                scan--
             } else {
                 break
             }
         }
-        return if (extra > 0) 1 + extra else 1
+        return deleteCount
     }
 
     fun transformFullText(text: String, style: ArabicFontStyle): String {
         if (style == ArabicFontStyle.NORMAL || text.isEmpty()) return text
         val sb = StringBuilder(text.length * 2)
         for (ch in text) {
-            val start = (sb.length - 4).coerceAtLeast(0)
+            val start = (sb.length - 6).coerceAtLeast(0)
             val before = sb.substring(start)
             sb.append(transformOnCommit(ch.toString(), before, style))
         }
