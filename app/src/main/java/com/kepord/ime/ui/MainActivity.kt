@@ -40,6 +40,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -50,9 +52,12 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewInAr
 import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -100,11 +105,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.kepord.ime.KepordApplication
+import com.kepord.ime.accessibility.TouchpadController
+import com.kepord.ime.ai.AiConfigState
+import com.kepord.ime.ai.AiKeyStatus
+import com.kepord.ime.ai.AiProvider
+import com.kepord.ime.ai.KepordAiEngine
+import com.kepord.ime.ai.KepordAiPrefs
 import com.kepord.ime.clipboard.ClipEntry
 import com.kepord.ime.clipboard.ClipboardStore
 import com.kepord.ime.data.KepordPreferences
 import com.kepord.ime.ime.ArabicFontEngine
 import com.kepord.ime.ime.ArabicFontStyle
+import com.kepord.ime.ime.MechanicalSoundEngine
+import com.kepord.ime.ime.MechanicalSoundProfile
 import com.kepord.ime.model.Background3DStyle
 import com.kepord.ime.model.KepordConfig
 import com.kepord.ime.model.LetterColorMode
@@ -132,7 +145,10 @@ class MainActivity : ComponentActivity() {
             KepordTheme {
                 KepordMainScreen(
                     preferences = app.preferences,
-                    clipboardStore = app.clipboardStore
+                    clipboardStore = app.clipboardStore,
+                    aiPrefs = app.aiPrefs,
+                    aiEngine = app.aiEngine,
+                    soundEngine = app.soundEngine
                 )
             }
         }
@@ -140,32 +156,39 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class KepordTab(val title: String, val icon: ImageVector) {
-    HOME_TEST("التجربة", Icons.Rounded.Keyboard),
-    LETTER_RGB("الأحرف", Icons.Rounded.Palette),
-    THREE_D("3D والخلفية", Icons.Rounded.ViewInAr),
-    FONTS_SYSTEM("الخط والنظام", Icons.Rounded.Tune),
-    CLIPBOARD("الحافظة", Icons.Rounded.ContentPaste)
+    HOME_TEST("تجربة", Icons.Rounded.Keyboard),
+    LETTER_RGB("أحرف", Icons.Rounded.Palette),
+    THREE_D("3D", Icons.Rounded.ViewInAr),
+    FONTS_SYSTEM("نظام", Icons.Rounded.Tune),
+    AI_CHAT("ذكاء", Icons.Rounded.AutoAwesome),
+    CLIPBOARD("حافظة", Icons.Rounded.ContentPaste)
 }
 
 @Composable
 private fun KepordMainScreen(
     preferences: KepordPreferences,
-    clipboardStore: ClipboardStore
+    clipboardStore: ClipboardStore,
+    aiPrefs: KepordAiPrefs,
+    aiEngine: KepordAiEngine,
+    soundEngine: MechanicalSoundEngine
 ) {
     val context = LocalContext.current
     val config by preferences.config.collectAsState()
     val clips by clipboardStore.entries.collectAsState()
+    val aiState by aiPrefs.state.collectAsState()
     var activeTab by remember { mutableIntStateOf(0) }
 
     var isImeEnabled by remember { mutableStateOf(false) }
     var isImeSelected by remember { mutableStateOf(false) }
+    var isAccEnabled by remember { mutableStateOf(false) }
 
-    fun refreshImeStatus() {
+    fun refreshSystemStatus() {
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         val enabledList = imm.enabledInputMethodList
         isImeEnabled = enabledList.any { it.packageName == context.packageName }
         val defaultIme = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         isImeSelected = defaultIme?.startsWith(context.packageName) == true
+        isAccEnabled = TouchpadController.isAccessibilityEnabled(context)
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboardStore.captureFromSystemClipboard(cm)
     }
@@ -174,14 +197,14 @@ private fun KepordMainScreen(
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                refreshImeStatus()
+                refreshSystemStatus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
-    LaunchedEffect(Unit) { refreshImeStatus() }
+    LaunchedEffect(Unit) { refreshSystemStatus() }
 
     Scaffold(
         modifier = Modifier
@@ -212,9 +235,9 @@ private fun KepordMainScreen(
                             letterSpacing = 1.8.sp
                         )
                         Text(
-                            text = "لوحة المفاتيح الميكانيكية 3D & الحافظة اللانهائية",
+                            text = "كيبورد 3D • ماوس شاشة • ذكاء بمفاتيح متعددة • حافظة لا نهائية",
                             color = KepordPalette.MutedGray,
-                            fontSize = 11.5.sp
+                            fontSize = 11.sp
                         )
                     }
                     Surface(
@@ -245,11 +268,11 @@ private fun KepordMainScreen(
                     NavigationBarItem(
                         selected = selected,
                         onClick = { activeTab = idx },
-                        icon = { Icon(tab.icon, contentDescription = tab.title) },
+                        icon = { Icon(tab.icon, contentDescription = tab.title, modifier = Modifier.size(21.dp)) },
                         label = {
                             Text(
                                 text = tab.title,
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 maxLines = 1
                             )
@@ -278,12 +301,16 @@ private fun KepordMainScreen(
                     clipsCount = clips.size,
                     isImeEnabled = isImeEnabled,
                     isImeSelected = isImeSelected,
+                    isAccEnabled = isAccEnabled,
                     onOpenImeSettings = {
                         context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                     },
                     onShowImePicker = {
                         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                         imm.showInputMethodPicker()
+                    },
+                    onOpenAccessibilitySettings = {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     },
                     onGoToFonts = { activeTab = KepordTab.FONTS_SYSTEM.ordinal },
                     onCopyToClipboard = { txt ->
@@ -306,11 +333,27 @@ private fun KepordMainScreen(
 
                 KepordTab.FONTS_SYSTEM -> FontsAndSystemTab(
                     config = config,
+                    isAccEnabled = isAccEnabled,
+                    soundEngine = soundEngine,
                     onUpdate = { preferences.update(it) },
+                    onOpenAccessibilitySettings = {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    },
+                    onTestTouchpad = {
+                        if (!TouchpadController.requestOpenTouchpad(context)) {
+                            Toast.makeText(context, "يرجى تفعيل خدمة الماوس في إمكانية الوصول أولاً", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     onResetDefaults = {
                         preferences.resetDefaults()
                         Toast.makeText(context, "تمت استعادة الإعدادات الافتراضية", Toast.LENGTH_SHORT).show()
                     }
+                )
+
+                KepordTab.AI_CHAT -> AiConfigurationTab(
+                    aiState = aiState,
+                    aiPrefs = aiPrefs,
+                    aiEngine = aiEngine
                 )
 
                 KepordTab.CLIPBOARD -> ClipboardVaultTab(
@@ -333,8 +376,10 @@ private fun HomeAndLiveTestTab(
     clipsCount: Int,
     isImeEnabled: Boolean,
     isImeSelected: Boolean,
+    isAccEnabled: Boolean,
     onOpenImeSettings: () -> Unit,
     onShowImePicker: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onGoToFonts: () -> Unit,
     onCopyToClipboard: (String) -> Unit
 ) {
@@ -348,7 +393,7 @@ private fun HomeAndLiveTestTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        LuxuryCard(title = "حالة التفعيل على النظام (Android 13)") {
+        LuxuryCard(title = "حالة التفعيل (Android 13)") {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -360,15 +405,14 @@ private fun HomeAndLiveTestTab(
                 )
                 Text(
                     text = when {
-                        isImeSelected -> "كيبورد Kepord محدد ونشط حالياً. كل تعديل تطبّقه يظهر فوراً أثناء التجربة."
-                        isImeEnabled -> "التطبيق مفعّل في النظام، اضغط (اختيار الكيبورد) وحدد Kepord Pro 3D."
-                        else -> "الخطوة 1: فعّل Kepord من إعدادات اللغة والإدخال، ثم الخطوة 2: اختره كلوحة مفاتيح نشطة."
+                        isImeSelected -> "كيبورد Kepord نشط الآن. جميع التعديلات تظهر فوراً في مربع التجربة."
+                        isImeEnabled -> "التطبيق مفعّل بالنظام، اضغط (اختيار Kepord) لتنشيطه."
+                        else -> "1: فعّل Kepord من إعدادات النظام، ثم 2: اختره كلوحة مفاتيح نشطة."
                     },
                     color = KepordPalette.SoftWhite,
-                    fontSize = 12.5.sp
+                    fontSize = 12.sp
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -379,7 +423,7 @@ private fun HomeAndLiveTestTab(
                     border = BorderStroke(1.dp, KepordPalette.PureWhite),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
                 ) {
-                    Text("1. تفعيل بالنظام", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("1. تفعيل بالنظام", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onShowImePicker,
@@ -389,8 +433,22 @@ private fun HomeAndLiveTestTab(
                         contentColor = KepordPalette.PureBlack
                     )
                 ) {
-                    Text("2. اختيار Kepord", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("2. اختيار Kepord", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+            OutlinedButton(
+                onClick = onOpenAccessibilitySettings,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, if (isAccEnabled) KepordPalette.PureWhite else KepordPalette.BorderStrong),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
+            ) {
+                Icon(Icons.Rounded.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isAccEnabled) "خدمة الماوس الشامل على الشاشة مفعلة ✓" else "تفعيل لوحة اللمس ومؤشر الماوس (Accessibility)",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
@@ -424,7 +482,7 @@ private fun HomeAndLiveTestTab(
                     .heightIn(min = 140.dp, max = 260.dp),
                 placeholder = {
                     Text(
-                        "اضغط هنا واكتب أو الصق لتجربة الإضاءة 3D والخطوط والإيموجي فوراً...",
+                        "اضغط هنا لتجربة الكيبورد والضغط المطوّل والماوس والذكاء الاصطناعي والخطوط...",
                         color = KepordPalette.MutedGray
                     )
                 },
@@ -468,7 +526,7 @@ private fun HomeAndLiveTestTab(
             ) {
                 OutlinedButton(
                     onClick = {
-                        val sample = "مرحباً بك في كيبورد Kepord Pro 3D!\nاختبار العربية مع التشكيل: أَبْجَدْ هَوَّزْ حُطِّي كَلَمُنْ — English Test 12345"
+                        val sample = "مرحباً بك في كيبورد Kepord Pro 3D!\nنص جاهز لاختبار تحديد الماوس أو الترجمة الفورية بالذكاء الاصطناعي."
                         onCopyToClipboard(sample)
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -483,7 +541,7 @@ private fun HomeAndLiveTestTab(
                         val sb = StringBuilder(95000)
                         for (i in 1..2000) {
                             sb.append("Line ").append(i).append(": val keycap_").append(i)
-                                .append(" = Kepord3DEngine.render(depth = 4, glow = true) // اختبار التحمل الكامل للأسطر\n")
+                                .append(" = Kepord3DEngine.render(depth = 4, glow = true)\n")
                         }
                         onCopyToClipboard(sb.toString())
                     },
@@ -825,10 +883,14 @@ private fun ThreeDBackgroundTab(
 @Composable
 private fun FontsAndSystemTab(
     config: KepordConfig,
+    isAccEnabled: Boolean,
+    soundEngine: MechanicalSoundEngine,
     onUpdate: ((KepordConfig) -> KepordConfig) -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onTestTouchpad: () -> Unit,
     onResetDefaults: () -> Unit
 ) {
-    val samplePhrase = "مرحبا بكم في كيبورد Kepord الفاخر"
+    val samplePhrase = "القرآن الكريم — مرحبا بكم في كيبورد Kepord"
 
     Column(
         modifier = Modifier
@@ -837,9 +899,9 @@ private fun FontsAndSystemTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        LuxuryCard(title = "أشهر 10 خطوط عربية للكتابة (تبقى فعالة حتى تغيرها)") {
+        LuxuryCard(title = "الخطوط العربية الاحترافية (10 خطوط حقيقية)") {
             Text(
-                text = "الخط الذي تختاره هنا سيكتب به الكيبورد تلقائياً في واتساب وتيليجرام وكل التطبيقات:",
+                text = "بما فيها الخط العثماني وخط الرقعة وخط اليد؛ يبقى الخط فعالاً في جميع التطبيقات حتى تغيره هنا:",
                 color = KepordPalette.MutedGray,
                 fontSize = 11.5.sp
             )
@@ -886,15 +948,89 @@ private fun FontsAndSystemTab(
             }
         }
 
-        LuxuryCard(title = "التخطيط واللغة والأبعاد") {
+        LuxuryCard(title = "صوت السويتشات الميكانيكية الحقيقي") {
+            LuxurySwitchRow(
+                title = "تفعيل الصوت الميكانيكي أثناء الكتابة",
+                subtitle = "صوت سويتشات حقيقية منخفض الكمون (بدلاً من صوت النظام العادي)",
+                checked = config.keySoundEnabled,
+                onCheckedChange = { b -> onUpdate { it.copy(keySoundEnabled = b) } }
+            )
+            MechanicalSoundProfile.entries.forEach { prof ->
+                SelectableRow(
+                    title = prof.titleAr,
+                    subtitle = prof.descAr,
+                    selected = config.mechanicalSoundProfile == prof,
+                    onClick = {
+                        onUpdate { it.copy(mechanicalSoundProfile = prof) }
+                        soundEngine.preloadProfileAsync(prof)
+                        soundEngine.playKeyClick(prof, config.keySoundVolume)
+                    }
+                )
+            }
+            LuxurySlider(
+                label = "مستوى صوت السويتش الميكانيكي",
+                valueText = "${(config.keySoundVolume * 100).roundToInt()}%",
+                value = config.keySoundVolume,
+                range = 0.1f..1.0f,
+                onValueChange = { v -> onUpdate { it.copy(keySoundVolume = v) } }
+            )
+            OutlinedButton(
+                onClick = { soundEngine.playKeyClick(config.mechanicalSoundProfile, config.keySoundVolume) },
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, KepordPalette.PureWhite),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
+            ) {
+                Icon(Icons.Rounded.VolumeUp, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("اختبار صوت السويتش الميكانيكي الآن", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        LuxuryCard(title = "لوحة اللمس المحمولة ومؤشر الماوس الشامل") {
+            Text(
+                text = if (isAccEnabled) {
+                    "خدمة الماوس مفعلة ✓. اضغط «🖱 ماوس» من أعلى الكيبورد لإظهار الماوس ولوحة اللمس."
+                } else {
+                    "ملاحظة لـ Realme Android 13: عند تفعيل خدمة إمكانية الوصول، إن ظهر الخيار مقيداً افتح معلومات التطبيق ← ⋮ ← السماح بالإعدادات المقيدة."
+                },
+                color = KepordPalette.MutedGray,
+                fontSize = 11.5.sp
+            )
+            LuxurySlider(
+                label = "سرعة وحساسية مؤشر الماوس",
+                valueText = String.format("%.2fx", config.touchpadSensitivity),
+                value = config.touchpadSensitivity,
+                range = 0.8f..3.5f,
+                onValueChange = { v -> onUpdate { it.copy(touchpadSensitivity = v) } }
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onOpenAccessibilitySettings,
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, KepordPalette.PureWhite),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = KepordPalette.PureWhite)
+                ) {
+                    Text("إعدادات الخدمة", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onTestTouchpad,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Text("تجربة الماوس الآن", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        LuxuryCard(title = "التخطيط واللغة والأبعاد والاهتزاز") {
             LuxurySwitchRow(
                 title = "لغة البدء الافتراضية: العربية",
-                subtitle = "زر AR/EN داخل الكيبورد يبدّل اللغة فوراً في أي وقت",
+                subtitle = "زر الكرة الأرضية 🌐 داخل الكيبورد يبدّل اللغة فوراً في أي وقت",
                 checked = config.defaultLanguageArabic,
                 onCheckedChange = { b -> onUpdate { it.copy(defaultLanguageArabic = b) } }
             )
             LuxurySwitchRow(
-                title = "صف الأرقام الدائم في الأعلى (1 - 0)",
+                title = "صف الأرقام الدائم في الأعلى",
                 subtitle = "صف أرقام ثابت أعلى لوحة الحروف مع بدائل بالضغط المطوّل",
                 checked = config.showNumberRow,
                 onCheckedChange = { b -> onUpdate { it.copy(showNumberRow = b) } }
@@ -913,9 +1049,6 @@ private fun FontsAndSystemTab(
                 range = 0.80f..1.35f,
                 onValueChange = { v -> onUpdate { it.copy(letterSizeScale = v) } }
             )
-        }
-
-        LuxuryCard(title = "التفاعل والاهتزاز والصوت (Realme GT)") {
             LuxurySlider(
                 label = "قوة الاهتزاز عند الضغط (Haptics)",
                 valueText = if (config.hapticStrengthMs == 0) "مغلق" else "${config.hapticStrengthMs} ms",
@@ -924,23 +1057,8 @@ private fun FontsAndSystemTab(
                 onValueChange = { v -> onUpdate { it.copy(hapticStrengthMs = v.roundToInt()) } }
             )
             LuxurySwitchRow(
-                title = "صوت النقر عند الكتابة",
-                subtitle = "نغمة نقر ميكانيكية خفيفة متزامنة مع اللمس",
-                checked = config.keySoundEnabled,
-                onCheckedChange = { b -> onUpdate { it.copy(keySoundEnabled = b) } }
-            )
-            if (config.keySoundEnabled) {
-                LuxurySlider(
-                    label = "مستوى صوت النقر",
-                    valueText = "${(config.keySoundVolume * 100).roundToInt()}%",
-                    value = config.keySoundVolume,
-                    range = 0.1f..1.0f,
-                    onValueChange = { v -> onUpdate { it.copy(keySoundVolume = v) } }
-                )
-            }
-            LuxurySwitchRow(
                 title = "نافذة تكبير الحرف عند اللمس (Popup)",
-                subtitle = "إظهار الحرف 3D مكبراً فوق إصبعك أثناء النقر",
+                subtitle = "إظهار الحرف 3D بوضوح فوق الشريط العلوي أثناء النقر",
                 checked = config.keyPopupEnabled,
                 onCheckedChange = { b -> onUpdate { it.copy(keyPopupEnabled = b) } }
             )
@@ -950,9 +1068,6 @@ private fun FontsAndSystemTab(
                 checked = config.spacebarCursorSwipe,
                 onCheckedChange = { b -> onUpdate { it.copy(spacebarCursorSwipe = b) } }
             )
-        }
-
-        LuxuryCard(title = "الكتابة الذكية") {
             LuxurySwitchRow(
                 title = "حرف كبير تلقائي في الإنجليزية (Auto-Caps)",
                 subtitle = "تفعيل Shift تلقائياً في بداية الجمل الإنجليزية",
@@ -976,6 +1091,330 @@ private fun FontsAndSystemTab(
             Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("استعادة جميع الإعدادات الافتراضية", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AiConfigurationTab(
+    aiState: AiConfigState,
+    aiPrefs: KepordAiPrefs,
+    aiEngine: KepordAiEngine
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var bulkKeysInput by remember { mutableStateOf("") }
+    var customBaseUrlInput by remember(aiState.customBaseUrl) { mutableStateOf(aiState.customBaseUrl) }
+    var manualModelInput by remember(aiState.selectedModel) { mutableStateOf(aiState.selectedModel) }
+    var systemPromptInput by remember(aiState.systemPrompt) { mutableStateOf(aiState.systemPrompt) }
+    var testPromptInput by remember { mutableStateOf("ما هو سعر صرف الدولار مقابل اليورو والريال اليوم؟") }
+    var testReplyOutput by remember { mutableStateOf("") }
+    var statusBanner by remember { mutableStateOf("") }
+    var isFetchingModels by remember { mutableStateOf(false) }
+    var isTestingChat by remember { mutableStateOf(false) }
+
+    val providerKeys = aiState.keys.filter { it.provider == aiState.provider }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        LuxuryCard(title = "مزود الذكاء الاصطناعي وبحث الإنترنت المباشر") {
+            AiProvider.entries.forEach { prov ->
+                SelectableRow(
+                    title = prov.titleAr,
+                    subtitle = prov.defaultBaseUrl,
+                    selected = aiState.provider == prov,
+                    onClick = {
+                        aiPrefs.update { cur ->
+                            cur.copy(
+                                provider = prov,
+                                selectedModel = aiPrefs.loadSelectedModelForProvider(prov),
+                                fetchedModels = aiPrefs.loadModelsForProvider(prov)
+                            )
+                        }
+                    }
+                )
+            }
+
+            if (aiState.provider == AiProvider.CUSTOM_OPENAI) {
+                OutlinedTextField(
+                    value = customBaseUrlInput,
+                    onValueChange = {
+                        customBaseUrlInput = it
+                        aiPrefs.update { cur -> cur.copy(customBaseUrl = it) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("رابط Base URL (متوافق مع OpenAI)", color = KepordPalette.MutedGray) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.White,
+                        unfocusedBorderColor = KepordPalette.BorderStrong,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+            }
+
+            LuxurySwitchRow(
+                title = "تفعيل بحث الإنترنت المباشر (Live Web Search)",
+                subtitle = "يجيب عن أسعار الصرف والأخبار والأسئلة الحديثة مباشرة من الويب",
+                checked = aiState.webSearchEnabled,
+                onCheckedChange = { b -> aiPrefs.update { it.copy(webSearchEnabled = b) } }
+            )
+        }
+
+        LuxuryCard(title = "مفاتيح API والتبديل الذكي التلقائي (${providerKeys.size} مفاتيح)") {
+            Text(
+                text = "أضف مفتاحاً واحداً أو عدة مفاتيح (مفتاح في كل سطر). عند نفاد حصة مفتاح أو بلوغ حده المؤقت يتم التبديل تلقائياً للمفتاح التالي دون انقطاع:",
+                color = KepordPalette.MutedGray,
+                fontSize = 11.5.sp
+            )
+
+            OutlinedTextField(
+                value = bulkKeysInput,
+                onValueChange = { bulkKeysInput = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 82.dp, max = 140.dp),
+                placeholder = {
+                    Text("الصق مفتاحاً أو عدة مفاتيح هنا (سطر لكل مفتاح)...", color = KepordPalette.MutedGray, fontSize = 12.sp)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = KepordPalette.BorderStrong,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedContainerColor = Color.Black,
+                    unfocusedContainerColor = Color.Black
+                )
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        aiPrefs.addKeysBulk(aiState.provider, bulkKeysInput)
+                        bulkKeysInput = ""
+                        Toast.makeText(context, "تمت إضافة المفاتيح لقائمة التبديل الذكي", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text("إضافة المفاتيح", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        aiPrefs.resetKeyStatuses(aiState.provider)
+                        Toast.makeText(context, "تم تصفير وإعادة تنشيط كل مفاتيح المزود", Toast.LENGTH_SHORT).show()
+                    },
+                    border = BorderStroke(1.dp, KepordPalette.BorderStrong),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                ) {
+                    Text("إعادة تنشيط الكل", fontSize = 11.sp)
+                }
+            }
+
+            if (providerKeys.isEmpty()) {
+                Text(
+                    text = "لا توجد مفاتيح مضافة بعد لهذا المزود.",
+                    color = KepordPalette.MutedGray,
+                    fontSize = 12.sp
+                )
+            } else {
+                providerKeys.forEach { k ->
+                    val now = System.currentTimeMillis()
+                    val statusLabel = if (k.status == AiKeyStatus.COOLDOWN && k.cooldownUntilMs > now) {
+                        val sec = ((k.cooldownUntilMs - now) / 1000L).coerceAtLeast(1L)
+                        "استراحة مؤقتة (${sec}s)"
+                    } else if (k.status == AiKeyStatus.COOLDOWN) {
+                        AiKeyStatus.ACTIVE.titleAr
+                    } else {
+                        k.status.titleAr
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = KepordPalette.PureBlack,
+                        border = BorderStroke(1.dp, if (k.status == AiKeyStatus.ACTIVE) KepordPalette.BorderStrong else Color.White)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${k.label}  •  ${KepordAiPrefs.maskKey(k.apiKey)}",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (k.lastError.isNotBlank() && k.status != AiKeyStatus.ACTIVE) "$statusLabel • ${k.lastError}" else statusLabel,
+                                    color = KepordPalette.MutedGray,
+                                    fontSize = 10.5.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = { aiPrefs.removeKey(k.id) },
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "حذف المفتاح", tint = KepordPalette.MutedGray, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        LuxuryCard(title = "النماذج المتاحة (استجلاب حي من المزود)") {
+            OutlinedTextField(
+                value = manualModelInput,
+                onValueChange = {
+                    manualModelInput = it
+                    aiPrefs.update { cur -> cur.copy(selectedModel = it.trim()) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("معرّف النموذج النشط", color = KepordPalette.MutedGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = KepordPalette.BorderStrong,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            Button(
+                onClick = {
+                    if (isFetchingModels) return@Button
+                    isFetchingModels = true
+                    statusBanner = "جاري الاتصال وجلب النماذج المتاحة..."
+                    scope.launch {
+                        val res = aiEngine.fetchAvailableModels()
+                        isFetchingModels = false
+                        statusBanner = res.message
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isFetchingModels) "جاري الاستجلاب..." else "استجلاب النماذج المتاحة من API",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+
+            if (statusBanner.isNotBlank()) {
+                Text(statusBanner, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+            }
+
+            if (aiState.fetchedModels.isNotEmpty()) {
+                Text("اختر نموذجاً من القائمة (${aiState.fetchedModels.size}):", color = KepordPalette.MutedGray, fontSize = 11.5.sp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    aiState.fetchedModels.forEach { m ->
+                        SelectableRow(
+                            title = m.displayName,
+                            subtitle = m.id,
+                            selected = aiState.selectedModel == m.id,
+                            onClick = {
+                                aiPrefs.update { cur -> cur.copy(selectedModel = m.id) }
+                                manualModelInput = m.id
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        LuxuryCard(title = "توجيه المساعد واختبار المحادثة والبحث") {
+            OutlinedTextField(
+                value = systemPromptInput,
+                onValueChange = {
+                    systemPromptInput = it
+                    aiPrefs.update { cur -> cur.copy(systemPrompt = it) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("تعليمات النظام (System Prompt)", color = KepordPalette.MutedGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = KepordPalette.BorderStrong,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            OutlinedTextField(
+                value = testPromptInput,
+                onValueChange = { testPromptInput = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("جرّب سؤالاً للذكاء + بحث الويب هنا", color = KepordPalette.MutedGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.White,
+                    unfocusedBorderColor = KepordPalette.BorderStrong,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
+
+            OutlinedButton(
+                onClick = {
+                    if (isTestingChat || testPromptInput.isBlank()) return@OutlinedButton
+                    isTestingChat = true
+                    testReplyOutput = "جاري الإرسال والتبديل الذكي للمفاتيح..."
+                    scope.launch {
+                        val res = aiEngine.sendChat(emptyList(), testPromptInput)
+                        isTestingChat = false
+                        val meta = buildList {
+                            if (res.usedKeyLabel.isNotBlank()) add(res.usedKeyLabel)
+                            if (res.switchedKeysCount > 0) add("تبديل ×${res.switchedKeysCount}")
+                            if (res.usedWebSearch) add("بحث ويب ✓")
+                            if (res.sourcesText.isNotBlank()) add(res.sourcesText)
+                        }.joinToString(" • ")
+                        testReplyOutput = if (meta.isNotBlank()) "${res.text}\n\n[$meta]" else res.text
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Color.White),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(if (isTestingChat) "جاري الرد..." else "اختبار الإرسال الآن", fontWeight = FontWeight.Bold)
+            }
+
+            if (testReplyOutput.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Black,
+                    border = BorderStroke(1.dp, KepordPalette.BorderStrong)
+                ) {
+                    Text(
+                        text = testReplyOutput,
+                        color = KepordPalette.SoftWhite,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
         }
     }
 }
