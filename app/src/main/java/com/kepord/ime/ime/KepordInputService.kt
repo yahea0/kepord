@@ -1,15 +1,22 @@
 package com.kepord.ime.ime
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import com.kepord.ime.KepordApplication
+import com.kepord.ime.accessibility.TouchpadController
+import com.kepord.ime.ai.AiChatMessage
+import com.kepord.ime.ai.KepordAiEngine
+import com.kepord.ime.ai.KepordAiPrefs
 import com.kepord.ime.clipboard.ClipEntry
 import com.kepord.ime.clipboard.ClipboardStore
 import com.kepord.ime.data.KepordPreferences
@@ -28,11 +35,17 @@ class KepordInputService : InputMethodService() {
 
     private lateinit var preferences: KepordPreferences
     private lateinit var clipboardStore: ClipboardStore
+    private lateinit var aiPrefs: KepordAiPrefs
+    private lateinit var aiEngine: KepordAiEngine
+    private lateinit var soundEngine: MechanicalSoundEngine
     private var clipboardManager: ClipboardManager? = null
 
     private var imePanel: KepordImePanel? = null
     private var lastSpaceMs = 0L
     private var isArabicCurrent = true
+
+    private val aiHistory = mutableListOf<AiChatMessage>()
+    private var isAiBusy = false
 
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener {
         clipboardStore.captureFromSystemClipboard(clipboardManager)
@@ -43,11 +56,22 @@ class KepordInputService : InputMethodService() {
         val app = applicationContext as KepordApplication
         preferences = app.preferences
         clipboardStore = app.clipboardStore
+        aiPrefs = app.aiPrefs
+        aiEngine = app.aiEngine
+        soundEngine = app.soundEngine
         isArabicCurrent = preferences.current().defaultLanguageArabic
 
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboardManager?.addPrimaryClipChangedListener(clipListener)
         clipboardStore.captureFromSystemClipboard(clipboardManager)
+
+        TouchpadController.imeBridge = object : TouchpadController.ImeBridge {
+            override fun onReturnToNormalKeyboard() {
+                serviceScope.launch {
+                    requestShowSelf(0)
+                }
+            }
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -55,7 +79,11 @@ class KepordInputService : InputMethodService() {
             override fun onPasteClip(entry: ClipEntry) {
                 serviceScope.launch {
                     val fullText = clipboardStore.readFullText(entry)
-                    commitLargeText(fullText)
+                    if (imePanel?.isAiPromptComposing() == true) {
+                        imePanel?.appendAiDraftText(fullText)
+                    } else {
+                        commitLargeText(fullText)
+                    }
                 }
             }
 
@@ -83,13 +111,21 @@ class KepordInputService : InputMethodService() {
             }
 
             override fun onCommitEmoji(emoji: String) {
-                currentInputConnection?.commitText(emoji, 1)
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.appendAiDraftText(emoji)
+                } else {
+                    currentInputConnection?.commitText(emoji, 1)
+                }
                 preferences.recordRecentEmoji(emoji)
                 imePanel?.updateRecentEmojis(preferences.getRecentEmojis())
             }
 
             override fun onEmojiBackspace() {
-                handleBackspace()
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.backspaceAiDraft()
+                } else {
+                    handleBackspace()
+                }
             }
 
             override fun onMoveCursor(delta: Int) {
@@ -113,21 +149,87 @@ class KepordInputService : InputMethodService() {
                 val text = cm.primaryClip?.takeIf { it.itemCount > 0 }
                     ?.getItemAt(0)?.coerceToText(this@KepordInputService)?.toString()
                     ?: return
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.appendAiDraftText(text)
+                } else {
+                    commitLargeText(text)
+                }
+            }
+
+            override fun onActivateMouseTouchpad() {
+                if (TouchpadController.requestOpenTouchpad(this@KepordInputService)) {
+                    requestHideSelf(0)
+                } else {
+                    imePanel?.switchMode(KepordImePanel.OverlayMode.TOUCHPAD_PROMPT)
+                }
+            }
+
+            override fun onOpenAccessibilitySettings() {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            }
+
+            override fun onSendAiPrompt(prompt: String) {
+                sendAiPromptInternal(prompt)
+            }
+
+            override fun onFetchAiModels() {
+                fetchAiModelsInternal()
+            }
+
+            override fun onSelectAiModel(modelId: String) {
+                aiPrefs.update { it.copy(selectedModel = modelId) }
+            }
+
+            override fun onToggleAiWebSearch() {
+                aiPrefs.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
+            }
+
+            override fun onInsertAiReply(text: String) {
                 commitLargeText(text)
             }
+
+            override fun onCopyAiReply(text: String) {
+                val cm = clipboardManager ?: return
+                cm.setPrimaryClip(ClipData.newPlainText("kepord_ai", text))
+                clipboardStore.saveTextAsync(text)
+                Toast.makeText(this@KepordInputService, "تم نسخ رد الذكاء الاصطناعي", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onClearAiChat() {
+                aiHistory.clear()
+                imePanel?.updateAiChatMessages(emptyList(), isLoading = false, statusNote = "")
+            }
+
+            override fun onAiComposerModeChanged(composing: Boolean) = Unit
         })
 
+        panel.keyboardView.soundEngine = soundEngine
         panel.keyboardView.listener = object : KepordKeyboardView.Listener {
             override fun onCommitText(text: String) {
-                handleCommitText(text)
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.appendAiDraftText(text)
+                } else {
+                    handleCommitText(text)
+                }
             }
 
             override fun onBackspace() {
-                handleBackspace()
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.backspaceAiDraft()
+                } else {
+                    handleBackspace()
+                }
             }
 
             override fun onEnter() {
-                handleEnter()
+                if (imePanel?.isAiPromptComposing() == true) {
+                    imePanel?.submitCurrentAiDraft()
+                } else {
+                    handleEnter()
+                }
             }
 
             override fun onMoveCursor(delta: Int) {
@@ -159,12 +261,19 @@ class KepordInputService : InputMethodService() {
                 imePanel?.updateClips(list)
             }
         }
+        serviceScope.launch {
+            aiPrefs.state.collectLatest { aiSt ->
+                imePanel?.updateAiState(aiSt)
+            }
+        }
 
         val cfg = preferences.current()
         panel.applyConfig(cfg, forceDefaultLang = true)
         panel.updateLanguageLabel(isArabicCurrent)
         panel.updateClips(clipboardStore.entries.value)
         panel.updateRecentEmojis(preferences.getRecentEmojis())
+        panel.updateAiState(aiPrefs.current())
+        panel.updateAiChatMessages(aiHistory.toList(), isLoading = false)
 
         return panel
     }
@@ -174,6 +283,7 @@ class KepordInputService : InputMethodService() {
         applyDarkImeNavigationBar()
         clipboardStore.captureFromSystemClipboard(clipboardManager)
         imePanel?.updateRecentEmojis(preferences.getRecentEmojis())
+        imePanel?.exitAiComposing()
         imePanel?.switchMode(KepordImePanel.OverlayMode.KEYBOARD)
         imePanel?.keyboardView?.setActiveWindowVisibility(true)
     }
@@ -184,9 +294,52 @@ class KepordInputService : InputMethodService() {
     }
 
     override fun onDestroy() {
+        TouchpadController.imeBridge = null
         clipboardManager?.removePrimaryClipChangedListener(clipListener)
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private fun sendAiPromptInternal(prompt: String) {
+        if (isAiBusy || prompt.isBlank()) return
+        isAiBusy = true
+        val priorHistory = aiHistory.toList()
+        aiHistory.add(AiChatMessage(isUser = true, text = prompt))
+        imePanel?.updateAiChatMessages(aiHistory.toList(), isLoading = true)
+
+        serviceScope.launch {
+            val res = aiEngine.sendChat(priorHistory, prompt)
+            val metaParts = mutableListOf<String>()
+            if (res.usedKeyLabel.isNotBlank()) metaParts.add(res.usedKeyLabel)
+            if (res.switchedKeysCount > 0) metaParts.add("تبديل تلقائي ×${res.switchedKeysCount}")
+            if (res.usedWebSearch) metaParts.add("بحث ويب ✓")
+            if (res.sourcesText.isNotBlank()) metaParts.add(res.sourcesText)
+
+            aiHistory.add(
+                AiChatMessage(
+                    isUser = false,
+                    text = res.text,
+                    meta = metaParts.joinToString(" • ")
+                )
+            )
+            isAiBusy = false
+            imePanel?.updateAiChatMessages(aiHistory.toList(), isLoading = false)
+        }
+    }
+
+    private fun fetchAiModelsInternal() {
+        if (isAiBusy) return
+        isAiBusy = true
+        imePanel?.updateAiChatMessages(aiHistory.toList(), isLoading = true, statusNote = "جاري جلب النماذج المتاحة...")
+        serviceScope.launch {
+            val res = aiEngine.fetchAvailableModels()
+            isAiBusy = false
+            imePanel?.updateAiChatMessages(
+                aiHistory.toList(),
+                isLoading = false,
+                statusNote = res.message
+            )
+        }
     }
 
     private fun toggleLanguage() {
@@ -224,7 +377,7 @@ class KepordInputService : InputMethodService() {
         }
 
         if (isArabicCurrent && cfg.arabicFontStyle != ArabicFontStyle.NORMAL) {
-            val before = ic.getTextBeforeCursor(4, 0)?.toString().orEmpty()
+            val before = ic.getTextBeforeCursor(6, 0)?.toString().orEmpty()
             val styled = ArabicFontEngine.transformOnCommit(text, before, cfg.arabicFontStyle)
             ic.commitText(styled, 1)
             return
@@ -243,7 +396,7 @@ class KepordInputService : InputMethodService() {
 
         val cfg = preferences.current()
         if (isArabicCurrent && cfg.arabicFontStyle != ArabicFontStyle.NORMAL) {
-            val before = ic.getTextBeforeCursor(5, 0)?.toString().orEmpty()
+            val before = ic.getTextBeforeCursor(6, 0)?.toString().orEmpty()
             val delCount = ArabicFontEngine.computeBackspaceDeleteCount(before, cfg.arabicFontStyle)
             if (delCount > 1) {
                 ic.deleteSurroundingText(delCount, 0)
